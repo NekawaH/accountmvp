@@ -111,9 +111,14 @@ export default function IDEPage() {
   const [showNewFile, setShowNewFile] = useState(false)
   const [showExamples, setShowExamples] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [running, setRunning] = useState(false)
   const [lineCount, setLineCount] = useState(1)
+  const [showPrompts, setShowPrompts] = useState(true)
   const inputBoxRef = useRef<HTMLTextAreaElement>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
+  const consoleRef = useRef<HTMLDivElement>(null)
+  const consoleInputRef = useRef<HTMLInputElement>(null)
+  const interpreterReady = useRef(false)
 
   const loadFileList = useCallback(async () => {
     const res = await fetch('/api/files')
@@ -122,6 +127,14 @@ export default function IDEPage() {
 
   useEffect(() => { loadFileList() }, [loadFileList])
   useEffect(() => { setLineCount(code.split('\n').length) }, [code])
+
+  // Init interpreter once script has loaded
+  function initInterpreter() {
+    const w = window as any
+    if (interpreterReady.current || !w.pseudoIDE || !consoleRef.current || !consoleInputRef.current) return
+    w.pseudoIDE.init(consoleRef.current, consoleInputRef.current, document.getElementById('showPrompts'))
+    interpreterReady.current = true
+  }
 
   async function openFile(f: PseudoFile) {
     const res = await fetch(`/api/files/${f.id}`)
@@ -175,27 +188,42 @@ export default function IDEPage() {
     setShowExamples(false)
   }
 
-  function runCode() {
-    const outputEl = document.getElementById('outputBox') as HTMLTextAreaElement
-    if (outputEl) outputEl.value = ''
-
-    // @ts-ignore
-    const PI = window.PseudoInterpreter
-    if (!PI) {
-      // Script hasn't executed yet — inject it synchronously as a fallback
-      const s = document.createElement('script')
-      s.src = '/pseudorunner/interpreter.js'
-      s.onload = () => runCode()
-      document.head.appendChild(s)
+  async function runCode() {
+    initInterpreter()
+    const w = window as any
+    if (!w.pseudoIDE) {
+      if (consoleRef.current) consoleRef.current.textContent = 'Error: interpreter not loaded yet, try again.'
       return
     }
+    if (consoleRef.current) consoleRef.current.textContent = ''
 
+    // Build vfs from user's saved files so file I/O works
+    const vfsRes = await fetch('/api/files')
+    const vfsFiles: PseudoFile[] = vfsRes.ok ? await vfsRes.json() : []
+    const vfs: Record<string, string> = {}
+    for (const f of vfsFiles) {
+      const r = await fetch(`/api/files/${f.id}`)
+      if (r.ok) { const d = await r.json(); vfs[f.name] = d.content }
+    }
+
+    setRunning(true)
     try {
-      const interpreter = new PI()
-      const parsed = interpreter.parse(code)
-      interpreter.execute(parsed)
+      const updatedVfs = await w.pseudoIDE.run(code, vfs)
+      // Persist any files that were written by the program
+      for (const [name, content] of Object.entries(updatedVfs as Record<string, string>)) {
+        if (vfs[name] !== content) {
+          await fetch('/api/files', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, content }),
+          })
+        }
+      }
+      await loadFileList()
     } catch (err: any) {
-      if (outputEl) outputEl.value = 'Error: ' + err.message
+      if (consoleRef.current) consoleRef.current.textContent += '\nError: ' + err.message
+    } finally {
+      setRunning(false)
     }
   }
 
@@ -247,7 +275,11 @@ export default function IDEPage() {
 
   return (
     <>
-      <Script src="/pseudorunner/interpreter.js" strategy="afterInteractive" />
+      <Script
+        src="/pseudorunner/async_interpreter.js"
+        strategy="afterInteractive"
+        onLoad={initInterpreter}
+      />
       <div className="flex h-screen bg-white overflow-hidden">
 
         {/* Sidebar */}
@@ -302,13 +334,23 @@ export default function IDEPage() {
           </div>
         </div>
 
-        {/* Editor */}
+        {/* Editor + Console */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Toolbar */}
           <div className="h-10 border-b border-gray-200 flex items-center px-3 gap-2 bg-white flex-shrink-0">
             <span className="text-sm font-mono text-gray-600 flex-1 truncate">
               {activeFile ? activeFile.name : <span className="italic text-gray-400">unsaved</span>}
             </span>
+            <label className="flex items-center gap-1 text-xs text-gray-500 cursor-pointer">
+              <input
+                id="showPrompts"
+                type="checkbox"
+                checked={showPrompts}
+                onChange={e => setShowPrompts(e.target.checked)}
+                className="accent-blue-600"
+              />
+              Show prompts
+            </label>
             <div className="relative">
               <button
                 onClick={() => setShowExamples(v => !v)}
@@ -329,50 +371,64 @@ export default function IDEPage() {
                 className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
               >{saving ? 'Saving…' : 'Save'}</button>
             )}
-            <button onClick={runCode}
-              className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-semibold"
-            >▶ Run</button>
+            <button onClick={runCode} disabled={running}
+              className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-semibold"
+            >{running ? '⏳ Running…' : '▶ Run'}</button>
           </div>
 
-          {/* Code area */}
-          <div className="flex-1 flex overflow-hidden border-b border-gray-200">
-            <div
-              ref={lineNumRef}
-              className="w-10 bg-gray-100 text-gray-400 text-right text-xs font-mono pt-2.5 pr-2 overflow-hidden select-none flex-shrink-0"
-              style={{ lineHeight: '21px' }}
-            >
-              {Array.from({ length: lineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Code editor */}
+            <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-200">
+              <div className="flex flex-1 overflow-hidden">
+                <div
+                  ref={lineNumRef}
+                  className="w-10 bg-gray-100 text-gray-400 text-right text-xs font-mono pt-2.5 pr-2 overflow-hidden select-none flex-shrink-0"
+                  style={{ lineHeight: '21px' }}
+                >
+                  {Array.from({ length: lineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
+                </div>
+                <textarea
+                  ref={inputBoxRef}
+                  id="inputBox"
+                  value={code}
+                  onChange={e => setCode(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onScroll={() => { if (lineNumRef.current && inputBoxRef.current) lineNumRef.current.scrollTop = inputBoxRef.current.scrollTop }}
+                  spellCheck={false}
+                  placeholder="Enter pseudocode here…"
+                  className="flex-1 resize-none font-mono text-sm bg-gray-50 text-gray-800 p-2.5 focus:outline-none"
+                  style={{ lineHeight: '21px' }}
+                />
+              </div>
             </div>
-            <textarea
-              ref={inputBoxRef}
-              id="inputBox"
-              value={code}
-              onChange={e => setCode(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onScroll={() => { if (lineNumRef.current && inputBoxRef.current) lineNumRef.current.scrollTop = inputBoxRef.current.scrollTop }}
-              spellCheck={false}
-              placeholder="Enter pseudocode here…"
-              className="flex-1 resize-none font-mono text-sm bg-gray-50 text-gray-800 p-2.5 focus:outline-none"
-              style={{ lineHeight: '21px' }}
-            />
-          </div>
 
-          {/* Output area */}
-          <div className="h-44 flex-shrink-0 flex flex-col">
-            <div className="px-3 py-1 bg-gray-100 border-b border-gray-200 flex justify-between items-center">
-              <span className="text-xs text-gray-500 font-medium">Output</span>
-              <button
-                onClick={() => { const el = document.getElementById('outputBox') as HTMLTextAreaElement; if (el) el.value = '' }}
-                className="text-xs text-gray-400 hover:text-gray-600"
-              >Clear</button>
+            {/* Console panel */}
+            <div className="w-80 flex-shrink-0 flex flex-col bg-white">
+              <div className="px-3 py-1.5 bg-gray-100 border-b border-gray-200 flex justify-between items-center">
+                <span className="text-xs font-medium text-gray-600">Console</span>
+                <button
+                  onClick={() => { if (consoleRef.current) consoleRef.current.textContent = '' }}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >Clear</button>
+              </div>
+              <div
+                ref={consoleRef}
+                className="flex-1 overflow-y-auto font-mono text-sm p-2.5 whitespace-pre-wrap bg-white text-gray-800"
+                style={{ lineHeight: '21px' }}
+              />
+              <div className="border-t border-gray-200 p-2">
+                <input
+                  ref={consoleInputRef}
+                  type="text"
+                  placeholder={running ? 'Type input and press Enter…' : 'Run program to use input'}
+                  disabled={!running}
+                  className="w-full text-sm font-mono border border-gray-300 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  When the program requests INPUT, type here and press Enter
+                </p>
+              </div>
             </div>
-            <textarea
-              id="outputBox"
-              readOnly
-              placeholder="Output will appear here…"
-              className="flex-1 resize-none font-mono text-sm bg-white text-gray-800 p-2.5 focus:outline-none"
-              style={{ lineHeight: '21px' }}
-            />
           </div>
         </div>
       </div>
