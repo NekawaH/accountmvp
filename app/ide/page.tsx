@@ -125,7 +125,21 @@ export default function IDEPage() {
   const loadFileList = useCallback(async () => {
     const res = await fetch('/api/files')
     if (!res.ok) return
-    const list: PseudoFile[] = await res.json()
+    let list: PseudoFile[] = await res.json()
+
+    // Create main.psc if it doesn't exist yet
+    if (!list.find(f => f.name === 'main.psc')) {
+      const created = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'main.psc', content: '' }),
+      })
+      if (created.ok) {
+        const newFile: LoadedFile = await created.json()
+        list = [newFile, ...list]
+      }
+    }
+
     setFiles(list)
     // Populate vfsMirror and window.vfs with all file contents
     const entries = await Promise.all(
@@ -135,6 +149,14 @@ export default function IDEPage() {
     for (const f of entries) vfs[f.name] = f.content
     vfsMirror.current = vfs
     ;(window as any).vfs = { ...vfs }
+
+    // Auto-open main.psc on first load if nothing is active
+    setActiveFile(prev => {
+      if (prev) return prev
+      const main = entries.find(f => f.name === 'main.psc')
+      if (main) { setCode(main.content) }
+      return main ?? null
+    })
   }, [])
 
   useEffect(() => { loadFileList() }, [loadFileList])
@@ -208,6 +230,16 @@ export default function IDEPage() {
       return
     }
     if (consoleRef.current) consoleRef.current.textContent = ''
+
+    // Autosave current .psc file before running
+    if (activeFile && activeFile.name.endsWith('.psc')) {
+      await fetch(`/api/files/${activeFile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: code }),
+      })
+      vfsMirror.current[activeFile.name] = code
+    }
 
     // Snapshot before run so we can detect new/changed files after
     const before = { ...vfsMirror.current }
