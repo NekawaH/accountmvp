@@ -179,16 +179,23 @@ export default function IDEPage() {
     const outputEl = document.getElementById('outputBox') as HTMLTextAreaElement
     if (outputEl) outputEl.value = ''
 
+    // @ts-ignore
+    const PI = window.PseudoInterpreter
+    if (!PI) {
+      // Script hasn't executed yet — inject it synchronously as a fallback
+      const s = document.createElement('script')
+      s.src = '/pseudorunner/interpreter.js'
+      s.onload = () => runCode()
+      document.head.appendChild(s)
+      return
+    }
+
     try {
-      // @ts-ignore
-      const PI = window.PseudoInterpreter
-      if (!PI) { alert('Interpreter not loaded yet, try again.'); return }
       const interpreter = new PI()
       const parsed = interpreter.parse(code)
       interpreter.execute(parsed)
     } catch (err: any) {
       if (outputEl) outputEl.value = 'Error: ' + err.message
-      else alert('Error: ' + err.message)
     }
   }
 
@@ -240,7 +247,7 @@ export default function IDEPage() {
 
   return (
     <>
-      <Script src="/pseudorunner/interpreter.js" strategy="beforeInteractive" />
+      <Script src="/pseudorunner/interpreter.js" strategy="afterInteractive" />
       <div className="flex h-screen bg-white overflow-hidden">
 
         {/* Sidebar */}
