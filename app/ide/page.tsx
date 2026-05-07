@@ -119,10 +119,22 @@ export default function IDEPage() {
   const consoleRef = useRef<HTMLDivElement>(null)
   const consoleInputRef = useRef<HTMLInputElement>(null)
   const interpreterReady = useRef(false)
+  // In-memory VFS mirror — kept in sync so runCode needs zero pre-fetch
+  const vfsMirror = useRef<Record<string, string>>({})
 
   const loadFileList = useCallback(async () => {
     const res = await fetch('/api/files')
-    if (res.ok) setFiles(await res.json())
+    if (!res.ok) return
+    const list: PseudoFile[] = await res.json()
+    setFiles(list)
+    // Populate vfsMirror and window.vfs with all file contents
+    const entries = await Promise.all(
+      list.map(f => fetch(`/api/files/${f.id}`).then(r => r.json()) as Promise<LoadedFile>)
+    )
+    const vfs: Record<string, string> = {}
+    for (const f of entries) vfs[f.name] = f.content
+    vfsMirror.current = vfs
+    ;(window as any).vfs = { ...vfs }
   }, [])
 
   useEffect(() => { loadFileList() }, [loadFileList])
@@ -197,21 +209,18 @@ export default function IDEPage() {
     }
     if (consoleRef.current) consoleRef.current.textContent = ''
 
-    // Build vfs from user's saved files so file I/O works
-    const vfsRes = await fetch('/api/files')
-    const vfsFiles: PseudoFile[] = vfsRes.ok ? await vfsRes.json() : []
-    const vfs: Record<string, string> = {}
-    for (const f of vfsFiles) {
-      const r = await fetch(`/api/files/${f.id}`)
-      if (r.ok) { const d = await r.json(); vfs[f.name] = d.content }
-    }
+    // Snapshot before run so we can detect new/changed files after
+    const before = { ...vfsMirror.current }
+    // Give the interpreter a fresh copy of the current VFS
+    w.vfs = { ...vfsMirror.current }
 
     setRunning(true)
     try {
-      const updatedVfs = await w.pseudoIDE.run(code, vfs)
-      // Persist any files that were written by the program
-      for (const [name, content] of Object.entries(updatedVfs as Record<string, string>)) {
-        if (vfs[name] !== content) {
+      await w.pseudoIDE.run(code, null) // vfs already set on window
+      // Sync any files that were created or changed by the program
+      const after: Record<string, string> = w.vfs
+      for (const [name, content] of Object.entries(after)) {
+        if (before[name] !== content) {
           await fetch('/api/files', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
