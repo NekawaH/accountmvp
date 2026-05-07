@@ -171,12 +171,10 @@ export default function IDEPage() {
   }
 
   async function openFile(f: PseudoFile) {
-    const res = await fetch(`/api/files/${f.id}`)
-    if (res.ok) {
-      const data: LoadedFile = await res.json()
-      setActiveFile(data)
-      setCode(data.content)
-    }
+    // Read from mirror — no network round-trip
+    const content = vfsMirror.current[f.name] ?? ''
+    setActiveFile({ ...f, content })
+    setCode(content)
   }
 
   async function saveFile() {
@@ -251,16 +249,23 @@ export default function IDEPage() {
       await w.pseudoIDE.run(code, null) // vfs already set on window
       // Sync any files that were created or changed by the program
       const after: Record<string, string> = w.vfs
+      const changed: string[] = []
       for (const [name, content] of Object.entries(after)) {
         if (before[name] !== content) {
+          changed.push(name)
           await fetch('/api/files', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ name, content }),
           })
+          vfsMirror.current[name] = content
         }
       }
-      await loadFileList()
+      // Refresh sidebar metadata only — no content re-fetch
+      if (changed.length > 0) {
+        const res = await fetch('/api/files')
+        if (res.ok) setFiles(await res.json())
+      }
     } catch (err: any) {
       if (consoleRef.current) consoleRef.current.textContent += '\nError: ' + err.message
     } finally {
