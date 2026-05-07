@@ -1,10 +1,10 @@
-// Pseudocode Async Interpreter — adapted from interpreter_client
-// Exposes window.pseudoIDE.run(source, vfs) → Promise
+// async_interpreter.js
+// Core from interpreter_client/interpreter.js — DOM wiring replaced with window.pseudoIDE API
+// All parse/execute/VFS logic is verbatim.
 (function () {
     let consoleEl = null;
-    let consoleInput = null;
+    let consoleInputEl = null;
     let awaitingInputResolver = null;
-    let showPrompts = true;
 
     function appendConsole(text) {
         if (!consoleEl) return;
@@ -17,13 +17,6 @@
         if (!consoleEl) return;
         consoleEl.textContent += text;
         consoleEl.scrollTop = consoleEl.scrollHeight;
-    }
-
-    function getConsoleInput() {
-        return new Promise(resolve => {
-            awaitingInputResolver = resolve;
-            if (consoleInput) consoleInput.focus();
-        });
     }
 
     // --- LEXER helpers ---
@@ -1278,13 +1271,17 @@
         };
     }
 
-    // Public API
-    window.pseudoIDE = {
-        init(outputEl, inputEl, promptsEl) {
-            consoleEl = outputEl;
-            consoleInput = inputEl;
-            showPrompts = promptsEl ? promptsEl.checked : true;
+    function getConsoleInput() {
+        return new Promise(resolve => {
+            awaitingInputResolver = resolve;
+            if (consoleInputEl) consoleInputEl.focus();
+        });
+    }
 
+    window.pseudoIDE = {
+        init(outputEl, inputEl) {
+            consoleEl = outputEl;
+            consoleInputEl = inputEl;
             inputEl.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     const v = inputEl.value;
@@ -1299,15 +1296,15 @@
         },
 
         async run(source, vfs) {
-            // Make vfs available globally for file operations
             if (vfs) window.vfs = vfs;
             if (!window.vfs) window.vfs = {};
-
-            showPrompts = document.getElementById('showPrompts')?.checked !== false;
-
-            const parsed = parse(source);
-            const ex = createExecutor(parsed.definitions);
-            await ex.execProgram(parsed.program);
+            try {
+                const parsed = parse(source);
+                const ex = createExecutor(parsed.definitions);
+                await ex.execProgram(parsed.program);
+            } catch (e) {
+                appendConsole('Error: ' + e.message);
+            }
             return window.vfs;
         }
     };
