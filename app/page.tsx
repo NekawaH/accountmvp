@@ -25,6 +25,12 @@ export default async function Home() {
             Your email is not verified. Check your inbox.
           </div>
         )}
+        <Link
+          href="/ide"
+          className="block w-full py-2.5 px-4 mb-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-center transition-colors"
+        >
+          Open Pseudocode IDE
+        </Link>
         <form action="/api/auth/logout" method="POST">
           <button
             type="submit"
