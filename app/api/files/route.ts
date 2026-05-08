@@ -2,12 +2,22 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { NextRequest, NextResponse } from 'next/server'
 
+async function authorizeWorkspace(userId: string, workspaceId: string) {
+  return prisma.workspace.findFirst({ where: { id: workspaceId, userId } })
+}
+
 export async function GET(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const workspaceId = req.nextUrl.searchParams.get('workspaceId')
+  if (!workspaceId) return NextResponse.json({ error: 'workspaceId required' }, { status: 400 })
+
+  const ws = await authorizeWorkspace(session.userId, workspaceId)
+  if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
   const files = await prisma.pseudoFile.findMany({
-    where: { userId: session.userId },
+    where: { workspaceId },
     select: { id: true, name: true, updatedAt: true },
     orderBy: { name: 'asc' },
   })
@@ -18,7 +28,8 @@ export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { name, content } = await req.json()
+  const { workspaceId, name, content } = await req.json()
+  if (!workspaceId) return NextResponse.json({ error: 'workspaceId required' }, { status: 400 })
   if (!name || typeof name !== 'string') {
     return NextResponse.json({ error: 'Name required' }, { status: 400 })
   }
@@ -26,9 +37,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Name must end in .psc or .txt' }, { status: 400 })
   }
 
+  const ws = await authorizeWorkspace(session.userId, workspaceId)
+  if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
   const file = await prisma.pseudoFile.upsert({
-    where: { userId_name: { userId: session.userId, name } },
-    create: { userId: session.userId, name, content: content ?? '' },
+    where: { workspaceId_name: { workspaceId, name } },
+    create: { workspaceId, name, content: content ?? '' },
     update: { content: content ?? '' },
   })
   return NextResponse.json(file)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Script from 'next/script'
 
@@ -103,7 +104,10 @@ CALL PrintFile("File.txt")`,
   },
 ]
 
-export default function IDEPage() {
+export default function WorkspacePage() {
+  const { id: workspaceId } = useParams<{ id: string }>()
+  const router = useRouter()
+
   const [files, setFiles] = useState<PseudoFile[]>([])
   const [activeFile, setActiveFile] = useState<LoadedFile | null>(null)
   const [code, setCode] = useState('')
@@ -114,17 +118,17 @@ export default function IDEPage() {
   const [running, setRunning] = useState(false)
   const [lineCount, setLineCount] = useState(1)
   const [showPrompts, setShowPrompts] = useState(true)
+  const [workspaceName, setWorkspaceName] = useState('')
   const inputBoxRef = useRef<HTMLTextAreaElement>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
   const consoleRef = useRef<HTMLDivElement>(null)
   const consoleInputRef = useRef<HTMLInputElement>(null)
   const interpreterReady = useRef(false)
-  // In-memory VFS mirror — kept in sync so runCode needs zero pre-fetch
   const vfsMirror = useRef<Record<string, string>>({})
 
   const loadFileList = useCallback(async () => {
-    const res = await fetch('/api/files')
-    if (!res.ok) return
+    const res = await fetch(`/api/files?workspaceId=${workspaceId}`)
+    if (!res.ok) { router.push('/'); return }
     let list: PseudoFile[] = await res.json()
 
     // Create main.psc if it doesn't exist yet
@@ -132,7 +136,7 @@ export default function IDEPage() {
       const created = await fetch('/api/files', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'main.psc', content: '' }),
+        body: JSON.stringify({ workspaceId, name: 'main.psc', content: '' }),
       })
       if (created.ok) {
         const newFile: LoadedFile = await created.json()
@@ -141,7 +145,6 @@ export default function IDEPage() {
     }
 
     setFiles(list)
-    // Populate vfsMirror and window.vfs with all file contents
     const entries = await Promise.all(
       list.map(f => fetch(`/api/files/${f.id}`).then(r => r.json()) as Promise<LoadedFile>)
     )
@@ -150,19 +153,23 @@ export default function IDEPage() {
     vfsMirror.current = vfs
     ;(window as any).vfs = { ...vfs }
 
-    // Auto-open main.psc on first load if nothing is active
     setActiveFile(prev => {
       if (prev) return prev
       const main = entries.find(f => f.name === 'main.psc')
       if (main) { setCode(main.content) }
       return main ?? null
     })
-  }, [])
+  }, [workspaceId, router])
 
-  useEffect(() => { loadFileList() }, [loadFileList])
+  useEffect(() => {
+    fetch(`/api/workspaces/${workspaceId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(ws => ws && setWorkspaceName(ws.name))
+    loadFileList()
+  }, [workspaceId, loadFileList])
+
   useEffect(() => { setLineCount(code.split('\n').length) }, [code])
 
-  // Init interpreter once script has loaded
   function initInterpreter() {
     const w = window as any
     if (interpreterReady.current || !w.pseudoIDE || !consoleRef.current || !consoleInputRef.current) return
@@ -171,7 +178,6 @@ export default function IDEPage() {
   }
 
   async function openFile(f: PseudoFile) {
-    // Read from mirror — no network round-trip
     const content = vfsMirror.current[f.name] ?? ''
     setActiveFile({ ...f, content })
     setCode(content)
@@ -195,7 +201,7 @@ export default function IDEPage() {
     const res = await fetch('/api/files', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, content: '' }),
+      body: JSON.stringify({ workspaceId, name, content: '' }),
     })
     if (res.ok) {
       const created: LoadedFile = await res.json()
@@ -229,7 +235,6 @@ export default function IDEPage() {
     }
     if (consoleRef.current) consoleRef.current.textContent = ''
 
-    // Autosave current .psc file before running
     if (activeFile && activeFile.name.endsWith('.psc')) {
       await fetch(`/api/files/${activeFile.id}`, {
         method: 'PUT',
@@ -239,15 +244,12 @@ export default function IDEPage() {
       vfsMirror.current[activeFile.name] = code
     }
 
-    // Snapshot before run so we can detect new/changed files after
     const before = { ...vfsMirror.current }
-    // Give the interpreter a fresh copy of the current VFS
     w.vfs = { ...vfsMirror.current }
 
     setRunning(true)
     try {
-      await w.pseudoIDE.run(code, null) // vfs already set on window
-      // Sync any files that were created or changed by the program
+      await w.pseudoIDE.run(code, null)
       const after: Record<string, string> = w.vfs
       const changed: string[] = []
       for (const [name, content] of Object.entries(after)) {
@@ -256,14 +258,13 @@ export default function IDEPage() {
           await fetch('/api/files', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, content }),
+            body: JSON.stringify({ workspaceId, name, content }),
           })
           vfsMirror.current[name] = content
         }
       }
-      // Refresh sidebar metadata only — no content re-fetch
       if (changed.length > 0) {
-        const res = await fetch('/api/files')
+        const res = await fetch(`/api/files?workspaceId=${workspaceId}`)
         if (res.ok) setFiles(await res.json())
       }
     } catch (err: any) {
@@ -331,10 +332,12 @@ export default function IDEPage() {
         {/* Sidebar */}
         <div className="w-52 flex-shrink-0 bg-gray-50 border-r border-gray-200 flex flex-col">
           <div className="p-3 border-b border-gray-200 flex items-center justify-between">
-            <span className="font-semibold text-sm text-gray-700">Files</span>
+            <span className="font-semibold text-sm text-gray-700 truncate" title={workspaceName}>
+              {workspaceName || 'Files'}
+            </span>
             <button
               onClick={() => setShowNewFile(v => !v)}
-              className="text-blue-600 hover:text-blue-800 text-xl font-bold leading-none"
+              className="text-blue-600 hover:text-blue-800 text-xl font-bold leading-none flex-shrink-0"
               title="New file"
             >+</button>
           </div>
@@ -373,7 +376,7 @@ export default function IDEPage() {
           </div>
 
           <div className="p-3 border-t border-gray-200 space-y-1.5">
-            <Link href="/" className="block text-xs text-center text-gray-500 hover:text-gray-700">← Dashboard</Link>
+            <Link href="/" className="block text-xs text-center text-gray-500 hover:text-gray-700">← Workspaces</Link>
             <form action="/api/auth/logout" method="POST">
               <button type="submit" className="w-full text-xs text-center text-gray-400 hover:text-gray-600">Sign out</button>
             </form>

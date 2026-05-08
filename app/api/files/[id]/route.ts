@@ -2,16 +2,19 @@ import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
 import { NextRequest, NextResponse } from 'next/server'
 
-async function getFile(session: { userId: string }, fileId: string) {
+async function getFile(userId: string, fileId: string) {
   return prisma.pseudoFile.findFirst({
-    where: { id: fileId, userId: session.userId },
+    where: {
+      id: fileId,
+      workspace: { userId },
+    },
   })
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const file = await getFile(session, params.id)
+  const file = await getFile(session.userId, params.id)
   if (!file) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json(file)
 }
@@ -19,7 +22,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const existing = await getFile(session, params.id)
+  const existing = await getFile(session.userId, params.id)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { content } = await req.json()
@@ -33,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const existing = await getFile(session, params.id)
+  const existing = await getFile(session.userId, params.id)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   await prisma.pseudoFile.delete({ where: { id: params.id } })
