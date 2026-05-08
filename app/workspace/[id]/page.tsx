@@ -522,7 +522,25 @@ export default function WorkspacePage() {
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     const ta = e.currentTarget
 
-    if (e.key === 'Tab') {
+    if (e.key === 'Backspace') {
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      // Only intercept when no selection and cursor isn't at start
+      if (start === end && start > 0) {
+        const val = ta.value
+        const lineStart = val.lastIndexOf('\n', start - 1) + 1
+        const beforeCursor = val.substring(lineStart, start)
+        // Only if everything before the cursor on this line is spaces
+        if (beforeCursor.length > 0 && /^ +$/.test(beforeCursor)) {
+          e.preventDefault()
+          const col = beforeCursor.length
+          const target = col % 4 === 0 ? col - 4 : col - (col % 4)
+          const deleteCount = col - Math.max(0, target)
+          ta.setSelectionRange(start - deleteCount, start)
+          document.execCommand('delete')
+        }
+      }
+    } else if (e.key === 'Tab') {
       e.preventDefault()
       const start = ta.selectionStart
       const end = ta.selectionEnd
