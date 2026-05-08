@@ -760,6 +760,8 @@ export default function WorkspacePage() {
                     if (!awaitingInputRef.current || !inputHandlerRef.current) { e.preventDefault(); return }
                     e.preventDefault()
                     const typed = ta.value.slice(protectedLenRef.current)
+                    // Strip what the user typed so the interpreter's echo is the only copy
+                    ta.value = ta.value.slice(0, protectedLenRef.current)
                     const w = window as any
                     if (w._termInputEl) w._termInputEl.value = typed
                     awaitingInputRef.current = false
