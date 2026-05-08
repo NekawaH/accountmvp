@@ -9,9 +9,15 @@ interface Workspace {
   createdAt: string
 }
 
+interface Profile {
+  username: string
+  avatarUrl: string
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
@@ -19,13 +25,10 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
-  async function loadWorkspaces() {
-    const res = await fetch('/api/workspaces')
-    if (res.ok) setWorkspaces(await res.json())
-    setLoading(false)
-  }
-
-  useEffect(() => { loadWorkspaces() }, [])
+  useEffect(() => {
+    fetch('/api/workspaces').then(r => r.ok ? r.json() : []).then(setWorkspaces).finally(() => setLoading(false))
+    fetch('/api/profile').then(r => r.ok ? r.json() : null).then(setProfile)
+  }, [])
 
   async function createWorkspace() {
     const name = newName.trim()
@@ -69,6 +72,20 @@ export default function DashboardPage() {
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
             >
               + New workspace
+            </button>
+            {/* Profile button */}
+            <button
+              onClick={() => router.push('/profile')}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors"
+              title="Profile"
+            >
+              {profile?.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={profile.avatarUrl} alt="avatar" className="w-6 h-6 rounded-full object-cover" />
+              ) : (
+                <div className="w-6 h-6 rounded-full bg-gray-200" />
+              )}
+              <span className="text-sm text-gray-700 font-medium">{profile?.username ?? '…'}</span>
             </button>
             <form action="/api/auth/logout" method="POST">
               <button
@@ -141,15 +158,11 @@ export default function DashboardPage() {
                       <button
                         onClick={() => deleteWorkspace(ws.id)}
                         className="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
-                      >
-                        Delete
-                      </button>
+                      >Delete</button>
                       <button
                         onClick={() => setConfirmDeleteId(null)}
                         className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
-                      >
-                        Cancel
-                      </button>
+                      >Cancel</button>
                     </div>
                   </div>
                 ) : (
@@ -167,16 +180,12 @@ export default function DashboardPage() {
                       <button
                         onClick={() => router.push(`/workspace/${ws.id}`)}
                         className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                      >
-                        Open
-                      </button>
+                      >Open</button>
                       <button
                         onClick={() => setConfirmDeleteId(ws.id)}
                         className="text-xs px-2.5 py-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete workspace"
-                      >
-                        ✕
-                      </button>
+                      >✕</button>
                     </div>
                   </div>
                 )}

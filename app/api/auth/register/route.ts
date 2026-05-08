@@ -4,6 +4,16 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
+const ADJECTIVES = ['swift','brave','calm','bold','keen','bright','cool','dark','fair','glad','gold','grey','iron','jade','kind','lime','mint','navy','oak','pine','red','rose','sage','sky','star','teal','warm','wild','wise','zeal']
+const NOUNS = ['wolf','hawk','bear','fox','lynx','crow','deer','dove','duck','eagle','elk','fawn','fish','frog','goat','hare','kite','lamb','lark','lion','mole','moth','newt','owl','puma','rook','seal','slug','swan','toad']
+
+function generateUsername(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)]
+  const num = Math.floor(100 + Math.random() * 900)
+  return `${adj}_${noun}_${num}`
+}
+
 export async function POST(req: NextRequest) {
   const { email, password } = await req.json()
 
@@ -21,10 +31,19 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(password, 12)
   const verifyToken = crypto.randomBytes(32).toString('hex')
-  const verifyTokenExp = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24h
+  const verifyTokenExp = new Date(Date.now() + 24 * 60 * 60 * 1000)
+
+  // Generate a unique username
+  let username = generateUsername()
+  while (await prisma.user.findUnique({ where: { username } })) {
+    username = generateUsername()
+  }
+
+  // Default avatar via DiceBear (stored as a URL)
+  const avatarUrl = `https://api.dicebear.com/8.x/thumbs/svg?seed=${encodeURIComponent(username)}`
 
   await prisma.user.create({
-    data: { email, passwordHash, verifyToken, verifyTokenExp },
+    data: { email, passwordHash, verifyToken, verifyTokenExp, username, avatarUrl },
   })
 
   await sendVerificationEmail(email, verifyToken)
