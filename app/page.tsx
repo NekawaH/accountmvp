@@ -16,6 +16,7 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   async function loadWorkspaces() {
     const res = await fetch('/api/workspaces')
@@ -29,6 +30,7 @@ export default function DashboardPage() {
     const name = newName.trim()
     if (!name) return
     setCreating(true)
+    setError('')
     const res = await fetch('/api/workspaces', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -40,6 +42,9 @@ export default function DashboardPage() {
       setNewName('')
       setShowCreate(false)
       router.push(`/workspace/${ws.id}`)
+    } else {
+      const json = await res.json().catch(() => ({}))
+      setError(json.error ?? `Server error ${res.status}`)
     }
   }
 
@@ -74,6 +79,12 @@ export default function DashboardPage() {
             </form>
           </div>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         {showCreate && (
           <div className="mb-6 bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex gap-3">
