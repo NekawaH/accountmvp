@@ -681,22 +681,22 @@ export default function WorkspacePage() {
                   className="text-xs text-gray-400 hover:text-gray-600"
                 >Clear</button>
               </div>
-              <div
-                ref={consoleRef}
-                className="flex-1 overflow-y-auto font-mono text-sm p-2.5 whitespace-pre-wrap bg-white text-gray-800"
-                style={{ lineHeight: '21px' }}
-              />
-              <div className="border-t border-gray-200 p-2">
-                <input
-                  ref={consoleInputRef}
-                  type="text"
-                  placeholder={running ? 'Type input and press Enter…' : 'Run program to use input'}
-                  disabled={!running}
-                  className="w-full text-sm font-mono border border-gray-300 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+              <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+                <div
+                  ref={consoleRef}
+                  className="flex-1 overflow-y-auto font-mono text-sm px-2.5 pt-2.5 whitespace-pre-wrap bg-white text-gray-800"
+                  style={{ lineHeight: '21px' }}
                 />
-                <p className="text-xs text-gray-400 mt-1">
-                  When the program requests INPUT, type here and press Enter
-                </p>
+                <div className="flex items-center px-2.5 py-2 font-mono text-sm bg-white">
+                  <span className="text-gray-400 select-none mr-1.5">›</span>
+                  <input
+                    ref={consoleInputRef}
+                    type="text"
+                    disabled={!running}
+                    className="flex-1 bg-transparent text-gray-800 focus:outline-none disabled:text-gray-300 min-w-0 text-sm font-mono"
+                    style={{ lineHeight: '21px' }}
+                  />
+                </div>
               </div>
             </div>
           </div>
