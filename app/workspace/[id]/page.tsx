@@ -132,11 +132,13 @@ export default function WorkspacePage() {
   // Leave confirmation banner
   const [showLeaveWarning, setShowLeaveWarning] = useState(false)
   const pendingLeave = useRef<(() => void) | null>(null)
+  const [consoleWidth, setConsoleWidth] = useState(320)
   const inputBoxRef = useRef<HTMLTextAreaElement>(null)
   const terminalRef = useRef<HTMLTextAreaElement>(null)
   const protectedLenRef = useRef(0)
   const inputHandlerRef = useRef<((e: any) => void) | null>(null)
   const awaitingInputRef = useRef(false)
+  const terminatedRef = useRef(false)
   const interpreterReady = useRef(false)
   const vfsMirror = useRef<Record<string, string>>({})
 
@@ -212,6 +214,7 @@ export default function WorkspacePage() {
     const inputEl: any = {
       value: '',
       focus() {
+        if (terminatedRef.current) throw new Error('Terminated')
         awaitingInputRef.current = true
         ta.focus()
         ta.selectionStart = ta.selectionEnd = ta.value.length
@@ -386,6 +389,18 @@ export default function WorkspacePage() {
     }
   }
 
+  function terminateProgram() {
+    terminatedRef.current = true
+    awaitingInputRef.current = false
+    // Unblock any pending input promise by firing the handler with a sentinel
+    if (inputHandlerRef.current) {
+      const w = window as any
+      if (w._termInputEl) w._termInputEl.value = ''
+      inputHandlerRef.current({ key: 'Enter' })
+    }
+    if (terminalRef.current) terminalRef.current.value += '\n[Terminated]'
+  }
+
   async function runCode() {
     initInterpreter()
     const w = window as any
@@ -394,6 +409,7 @@ export default function WorkspacePage() {
       return
     }
     if (terminalRef.current) { terminalRef.current.value = ''; protectedLenRef.current = 0 }
+    terminatedRef.current = false
 
     // Autosave active file before running
     if (activeFile && activeFile.name.endsWith('.psc')) {
@@ -429,7 +445,9 @@ export default function WorkspacePage() {
         if (res.ok) setFiles(await res.json())
       }
     } catch (err: any) {
-      if (terminalRef.current) terminalRef.current.value += '\nError: ' + err.message
+      if (!terminatedRef.current) {
+        if (terminalRef.current) terminalRef.current.value += '\nError: ' + err.message
+      }
     } finally {
       setRunning(false)
     }
@@ -667,14 +685,19 @@ export default function WorkspacePage() {
             <button onClick={saveFile} disabled={saving}
               className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
             >{saving ? 'Saving…' : 'Save'}</button>
-            <button onClick={runCode} disabled={running}
-              className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-semibold"
-            >{running ? '⏳ Running…' : '▶ Run'}</button>
+            {running
+              ? <button onClick={terminateProgram}
+                  className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-semibold"
+                >■ Stop</button>
+              : <button onClick={runCode}
+                  className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-semibold"
+                >▶ Run</button>
+            }
           </div>
 
           <div className="flex-1 flex overflow-hidden min-h-0">
             {/* Code editor */}
-            <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-200 min-h-0">
+            <div className="flex-1 flex flex-col overflow-hidden min-h-0">
               {/* Single scrolling container — line numbers and textarea scroll together */}
               <div className="flex flex-1 overflow-auto min-h-0 bg-gray-50">
                 <div
@@ -704,8 +727,22 @@ export default function WorkspacePage() {
               </div>
             </div>
 
+            {/* Drag handle */}
+            <div
+              className="w-1 flex-shrink-0 cursor-col-resize bg-gray-200 hover:bg-blue-400 active:bg-blue-500 transition-colors"
+              onMouseDown={e => {
+                e.preventDefault()
+                const startX = e.clientX
+                const startW = consoleWidth
+                const onMove = (ev: MouseEvent) => setConsoleWidth(Math.max(180, Math.min(800, startW - (ev.clientX - startX))))
+                const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+                window.addEventListener('mousemove', onMove)
+                window.addEventListener('mouseup', onUp)
+              }}
+            />
+
             {/* Terminal panel */}
-            <div className="w-80 flex-shrink-0 flex flex-col bg-white">
+            <div className="flex-shrink-0 flex flex-col bg-white" style={{ width: consoleWidth }}>
               <div className="px-3 py-1.5 bg-gray-100 border-b border-gray-200 flex justify-between items-center">
                 <span className="text-xs font-medium text-gray-600">Console</span>
                 <button
