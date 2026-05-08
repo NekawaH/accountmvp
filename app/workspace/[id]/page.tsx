@@ -453,6 +453,72 @@ export default function WorkspacePage() {
     }
   }
 
+  function formatCode(src: string): string {
+    const lines = src.split('\n')
+    let indent = 0
+    const IND = '    '
+    const result: string[] = []
+    let inCase = false
+    let caseIndent = 0
+
+    for (const raw of lines) {
+      const line = raw.trim()
+      if (line === '') { result.push(''); continue }
+
+      const up = line.toUpperCase()
+      const tok0 = up.split(/\s+/)[0]
+
+      // Keywords that close a block (dedent before printing)
+      const isClose = ['ENDIF','NEXT','ENDWHILE','ENDFUNCTION','ENDPROCEDURE','ENDTYPE','ENDCLASS','ENDCASE'].includes(tok0)
+        || tok0 === 'ELSE' || up.startsWith('ELSE IF ')
+        || (inCase && tok0 === 'UNTIL') // REPEAT/UNTIL handled below
+
+      // UNTIL closes REPEAT
+      const isUntil = tok0 === 'UNTIL'
+
+      if (isClose || isUntil) indent = Math.max(0, indent - 1)
+
+      // CASE branch labels: "value :" or "OTHERWISE :"
+      // Inside a CASE block they sit at caseIndent+1, their bodies at caseIndent+2
+      // We handle this by detecting ":" at end of a non-keyword line inside CASE
+      let lineIndent = indent
+      if (inCase && !isClose) {
+        const colonIdx = line.indexOf(':')
+        const isBranchLabel = colonIdx > 0 && colonIdx < line.length - 1
+          ? false // inline branch+body, treat as normal
+          : colonIdx === line.length - 1 || (tok0 === 'OTHERWISE')
+        if (isBranchLabel || tok0 === 'OTHERWISE') {
+          lineIndent = caseIndent + 1
+        }
+      }
+
+      result.push(IND.repeat(Math.max(0, lineIndent)) + line)
+
+      // Keywords that open a block (indent after printing)
+      const opensBlock =
+        (tok0 === 'IF' && up.includes(' THEN')) ||
+        tok0 === 'ELSE' || up.startsWith('ELSE IF ') ||
+        tok0 === 'FOR' ||
+        (tok0 === 'WHILE' && up.includes(' DO')) ||
+        tok0 === 'REPEAT' ||
+        tok0 === 'FUNCTION' ||
+        tok0 === 'PROCEDURE' ||
+        tok0 === 'TYPE' ||
+        tok0 === 'CLASS' ||
+        (tok0 === 'CASE' && up.startsWith('CASE OF'))
+
+      if (tok0 === 'CASE' && up.startsWith('CASE OF')) {
+        inCase = true
+        caseIndent = indent
+      }
+      if (tok0 === 'ENDCASE') inCase = false
+
+      if (opensBlock) indent++
+    }
+
+    return result.join('\n')
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     const ta = e.currentTarget
     const start = ta.selectionStart
@@ -484,10 +550,38 @@ export default function WorkspacePage() {
     } else if (e.key === 'Enter') {
       e.preventDefault()
       const textBefore = code.substring(0, start)
-      const indent = textBefore.substring(textBefore.lastIndexOf('\n') + 1).match(/^\s*/)?.[0] ?? ''
-      const newVal = code.substring(0, start) + '\n' + indent + code.substring(end)
+      const currentLine = textBefore.substring(textBefore.lastIndexOf('\n') + 1)
+      const currentIndent = currentLine.match(/^(\s*)/)?.[1] ?? ''
+      const trimmed = currentLine.trim().toUpperCase()
+      const tok0 = trimmed.split(/\s+/)[0]
+      const lineAfter = code.substring(end).match(/^([^\n]*)/)?.[1]?.trim().toUpperCase() ?? ''
+      const tok0After = lineAfter.split(/\s+/)[0]
+
+      // Closing keyword on next line: keep current indent (don't add extra)
+      const nextIsClose = ['ENDIF','NEXT','ENDWHILE','ENDFUNCTION','ENDPROCEDURE','ENDTYPE','ENDCLASS','ENDCASE','UNTIL','ELSE'].includes(tok0After)
+        || lineAfter.startsWith('ELSE IF ')
+
+      // Current line opens a block
+      const opensBlock =
+        (tok0 === 'IF' && trimmed.includes(' THEN')) ||
+        tok0 === 'ELSE' || trimmed.startsWith('ELSE IF ') ||
+        tok0 === 'FOR' ||
+        (tok0 === 'WHILE' && trimmed.includes(' DO')) ||
+        tok0 === 'REPEAT' ||
+        tok0 === 'FUNCTION' ||
+        tok0 === 'PROCEDURE' ||
+        tok0 === 'TYPE' ||
+        tok0 === 'CLASS' ||
+        (tok0 === 'CASE' && trimmed.startsWith('CASE OF'))
+
+      const IND = '    '
+      const newIndent = opensBlock && !nextIsClose
+        ? currentIndent + IND
+        : currentIndent
+
+      const newVal = code.substring(0, start) + '\n' + newIndent + code.substring(end)
       setCode(newVal)
-      setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + 1 + indent.length }, 0)
+      setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + 1 + newIndent.length }, 0)
     }
   }
 
@@ -685,6 +779,10 @@ export default function WorkspacePage() {
             <button onClick={saveFile} disabled={saving}
               className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
             >{saving ? 'Saving…' : 'Save'}</button>
+            <button onClick={() => setCode(formatCode(code))}
+              className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50"
+              title="Format code"
+            >Format</button>
             {running
               ? <button onClick={terminateProgram}
                   className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-semibold"
