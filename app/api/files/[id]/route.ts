@@ -4,19 +4,27 @@ import { NextRequest, NextResponse } from 'next/server'
 
 async function getFile(userId: string, fileId: string) {
   return prisma.pseudoFile.findFirst({
-    where: {
-      id: fileId,
-      workspace: { userId },
-    },
+    where: { id: fileId, workspace: { userId } },
   })
 }
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const file = await getFile(session.userId, params.id)
+  // Allow unauthenticated read if file belongs to a public workspace
+  const file = await prisma.pseudoFile.findUnique({
+    where: { id: params.id },
+    include: { workspace: { select: { isPublic: true, userId: true } } },
+  })
   if (!file) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(file)
+
+  if (!file.workspace.isPublic) {
+    const session = await getSession()
+    if (!session || session.userId !== file.workspace.userId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+  }
+
+  const { workspace: _, ...fileData } = file
+  return NextResponse.json(fileData)
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {

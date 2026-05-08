@@ -7,14 +7,19 @@ async function authorizeWorkspace(userId: string, workspaceId: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const workspaceId = req.nextUrl.searchParams.get('workspaceId')
   if (!workspaceId) return NextResponse.json({ error: 'workspaceId required' }, { status: 400 })
 
-  const ws = await authorizeWorkspace(session.userId, workspaceId)
+  // Allow unauthenticated read if workspace is public
+  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId } })
   if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  if (!ws.isPublic) {
+    const session = await getSession()
+    if (!session || session.userId !== ws.userId) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+  }
 
   const files = await prisma.pseudoFile.findMany({
     where: { workspaceId },
