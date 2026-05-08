@@ -521,47 +521,61 @@ export default function WorkspacePage() {
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     const ta = e.currentTarget
-    const start = ta.selectionStart
-    const end = ta.selectionEnd
 
     if (e.key === 'Tab') {
       e.preventDefault()
-      const lines = code.split('\n')
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const val = ta.value
+
       if (e.shiftKey) {
-        const sl = code.substring(0, start).split('\n').length - 1
-        const el = code.substring(0, end).split('\n').length - 1
-        let moved = 0, firstMoved = 0
-        for (let i = sl; i <= el; i++) {
-          const m = lines[i].match(/^( {1,4})/)
-          if (m) { lines[i] = lines[i].substring(m[0].length); moved++; if (i === sl) firstMoved = m[0].length }
-        }
-        setCode(lines.join('\n'))
-        setTimeout(() => { ta.selectionStart = start - firstMoved; ta.selectionEnd = end - moved * 4 }, 0)
-      } else if (start !== end) {
-        const sl = code.substring(0, start).split('\n').length - 1
-        const el = code.substring(0, end).split('\n').length - 1
-        for (let i = sl; i <= el; i++) lines[i] = '    ' + lines[i]
-        setCode(lines.join('\n'))
-        setTimeout(() => { ta.selectionStart = start + 4; ta.selectionEnd = end + (el - sl + 1) * 4 }, 0)
+        // Shift+Tab: remove up to 4 leading spaces from each selected line
+        const lineStart = val.lastIndexOf('\n', start - 1) + 1
+        const blockEnd = end > start && val[end - 1] === '\n' ? end - 1 : end
+        const block = val.substring(lineStart, blockEnd)
+        const lines = block.split('\n')
+        let firstRemoved = 0
+        let totalRemoved = 0
+        const newLines = lines.map((l, i) => {
+          const m = l.match(/^( {1,4})/)
+          const removed = m ? m[1].length : 0
+          if (i === 0) firstRemoved = removed
+          totalRemoved += removed
+          return removed ? l.slice(removed) : l
+        })
+        ta.setSelectionRange(lineStart, lineStart + block.length)
+        document.execCommand('insertText', false, newLines.join('\n'))
+        ta.setSelectionRange(Math.max(lineStart, start - firstRemoved), end - totalRemoved)
+      } else if (start === end) {
+        // No selection: insert 4 spaces
+        document.execCommand('insertText', false, '    ')
       } else {
-        setCode(code.substring(0, start) + '    ' + code.substring(end))
-        setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + 4 }, 0)
+        // Selection spans lines: indent each line
+        const lineStart = val.lastIndexOf('\n', start - 1) + 1
+        const blockEnd = val[end - 1] === '\n' ? end - 1 : end
+        const block = val.substring(lineStart, blockEnd)
+        const lines = block.split('\n')
+        ta.setSelectionRange(lineStart, lineStart + block.length)
+        document.execCommand('insertText', false, lines.map(l => '    ' + l).join('\n'))
+        ta.setSelectionRange(start + 4, end + lines.length * 4)
       }
+
     } else if (e.key === 'Enter') {
       e.preventDefault()
-      const textBefore = code.substring(0, start)
+      const start = ta.selectionStart
+      const end = ta.selectionEnd
+      const val = ta.value
+
+      const textBefore = val.substring(0, start)
       const currentLine = textBefore.substring(textBefore.lastIndexOf('\n') + 1)
       const currentIndent = currentLine.match(/^(\s*)/)?.[1] ?? ''
       const trimmed = currentLine.trim().toUpperCase()
       const tok0 = trimmed.split(/\s+/)[0]
-      const lineAfter = code.substring(end).match(/^([^\n]*)/)?.[1]?.trim().toUpperCase() ?? ''
+      const lineAfter = val.substring(end).match(/^([^\n]*)/)?.[1]?.trim().toUpperCase() ?? ''
       const tok0After = lineAfter.split(/\s+/)[0]
 
-      // Closing keyword on next line: keep current indent (don't add extra)
-      const nextIsClose = ['ENDIF','NEXT','ENDWHILE','ENDFUNCTION','ENDPROCEDURE','ENDTYPE','ENDCLASS','ENDCASE','UNTIL','ELSE'].includes(tok0After)
-        || lineAfter.startsWith('ELSE IF ')
-
-      // Current line opens a block
+      const closers = ['ENDIF','NEXT','ENDWHILE','ENDFUNCTION','ENDPROCEDURE','ENDTYPE','ENDCLASS','ENDCASE','UNTIL','ELSE']
+      const nextIsClose = closers.includes(tok0After) || lineAfter.startsWith('ELSE IF ')
       const opensBlock =
         (tok0 === 'IF' && trimmed.includes(' THEN')) ||
         tok0 === 'ELSE' || trimmed.startsWith('ELSE IF ') ||
@@ -574,14 +588,8 @@ export default function WorkspacePage() {
         tok0 === 'CLASS' ||
         (tok0 === 'CASE' && trimmed.startsWith('CASE OF'))
 
-      const IND = '    '
-      const newIndent = opensBlock && !nextIsClose
-        ? currentIndent + IND
-        : currentIndent
-
-      const newVal = code.substring(0, start) + '\n' + newIndent + code.substring(end)
-      setCode(newVal)
-      setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + 1 + newIndent.length }, 0)
+      const newIndent = (opensBlock && !nextIsClose) ? currentIndent + '    ' : currentIndent
+      document.execCommand('insertText', false, '\n' + newIndent)
     }
   }
 
@@ -779,7 +787,13 @@ export default function WorkspacePage() {
             <button onClick={saveFile} disabled={saving}
               className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
             >{saving ? 'Saving…' : 'Save'}</button>
-            <button onClick={() => setCode(formatCode(code))}
+            <button onClick={() => {
+                const ta = inputBoxRef.current
+                if (!ta) return
+                ta.focus()
+                ta.setSelectionRange(0, ta.value.length)
+                document.execCommand('insertText', false, formatCode(code))
+              }}
               className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50"
               title="Format code"
             >Format</button>
