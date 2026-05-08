@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import Script from 'next/script'
 
 interface PseudoFile {
@@ -120,15 +119,20 @@ export default function WorkspacePage() {
   const [showExamples, setShowExamples] = useState(false)
   const [saving, setSaving] = useState(false)
   const [running, setRunning] = useState(false)
-  const [lineCount, setLineCount] = useState(1)
   const [showPrompts, setShowPrompts] = useState(true)
   const [workspaceName, setWorkspaceName] = useState('')
-  // Rename state: which file id is being renamed, and the draft value
+  const [filesLoading, setFilesLoading] = useState(true)
+  // Rename state
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null)
+  // Draft state: in-memory unsaved edits per file id
+  const drafts = useRef<Record<string, string>>({})
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
+  // Leave confirmation banner
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false)
+  const pendingLeave = useRef<(() => void) | null>(null)
   const inputBoxRef = useRef<HTMLTextAreaElement>(null)
-  const lineNumRef = useRef<HTMLDivElement>(null)
   const consoleRef = useRef<HTMLDivElement>(null)
   const consoleInputRef = useRef<HTMLInputElement>(null)
   const interpreterReady = useRef(false)
@@ -163,10 +167,16 @@ export default function WorkspacePage() {
     setActiveFile(prev => {
       if (prev) return prev
       const main = entries.find(f => f.name === 'main.psc')
-      if (main) { setCode(main.content) }
+      if (main) { setCode(drafts.current[main.id] ?? main.content) }
       return main ?? null
     })
+    setFilesLoading(false)
   }, [workspaceId, router])
+
+  useEffect(() => {
+    document.documentElement.style.overflow = 'hidden'
+    return () => { document.documentElement.style.overflow = '' }
+  }, [])
 
   useEffect(() => {
     fetch(`/api/workspaces/${workspaceId}`)
@@ -175,7 +185,7 @@ export default function WorkspacePage() {
     loadFileList()
   }, [workspaceId, loadFileList])
 
-  useEffect(() => { setLineCount(code.split('\n').length) }, [code])
+  const lineCount = code.split('\n').length
 
   function initInterpreter() {
     const w = window as any
@@ -185,7 +195,18 @@ export default function WorkspacePage() {
   }
 
   async function openFile(f: PseudoFile) {
-    const content = vfsMirror.current[f.name] ?? ''
+    // Stash current edits as a draft
+    if (activeFile) {
+      drafts.current[activeFile.id] = code
+      const saved = vfsMirror.current[activeFile.name] ?? activeFile.content
+      setDirtyIds(prev => {
+        const next = new Set(prev)
+        if (code !== saved) next.add(activeFile.id); else next.delete(activeFile.id)
+        return next
+      })
+    }
+    // Restore draft or saved content
+    const content = drafts.current[f.id] ?? vfsMirror.current[f.name] ?? ''
     setActiveFile({ ...f, content })
     setCode(content)
   }
@@ -200,6 +221,8 @@ export default function WorkspacePage() {
         body: JSON.stringify({ content: code }),
       })
       vfsMirror.current[activeFile.name] = code
+      delete drafts.current[activeFile.id]
+      setDirtyIds(prev => { const next = new Set(prev); next.delete(activeFile.id); return next })
       setSaving(false)
     } else {
       // Unsaved buffer — ask for a name then create
@@ -221,6 +244,31 @@ export default function WorkspacePage() {
     }
   }
 
+  async function saveAllDrafts() {
+    setSaving(true)
+    for (const [fileId, content] of Object.entries(drafts.current)) {
+      await fetch(`/api/files/${fileId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      })
+      const file = files.find(f => f.id === fileId)
+      if (file) vfsMirror.current[file.name] = content
+    }
+    // Also save current active file
+    if (activeFile) {
+      await fetch(`/api/files/${activeFile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: code }),
+      })
+      vfsMirror.current[activeFile.name] = code
+    }
+    drafts.current = {}
+    setDirtyIds(new Set())
+    setSaving(false)
+  }
+
   async function createFile() {
     let name = newFileName.trim()
     if (!name) return
@@ -240,9 +288,26 @@ export default function WorkspacePage() {
     }
   }
 
+  function hasDirtyFiles() {
+    // active file dirty?
+    if (activeFile && code !== (vfsMirror.current[activeFile.name] ?? activeFile.content)) return true
+    return dirtyIds.size > 0
+  }
+
+  function safeNavigate(action: () => void) {
+    if (hasDirtyFiles()) {
+      pendingLeave.current = action
+      setShowLeaveWarning(true)
+    } else {
+      action()
+    }
+  }
+
   async function deleteFile(f: PseudoFile) {
     await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
     if (activeFile?.id === f.id) { setActiveFile(null); setCode('') }
+    delete drafts.current[f.id]
+    setDirtyIds(prev => { const next = new Set(prev); next.delete(f.id); return next })
     setConfirmDeleteFileId(null)
     await loadFileList()
   }
@@ -391,6 +456,39 @@ export default function WorkspacePage() {
         strategy="afterInteractive"
         onLoad={initInterpreter}
       />
+
+      {/* Leave warning banner */}
+      {showLeaveWarning && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-8 pointer-events-none">
+          <div className="bg-white border border-yellow-300 shadow-xl rounded-xl px-5 py-4 flex items-center gap-4 pointer-events-auto">
+            <span className="text-sm text-gray-800">You have unsaved changes. Leave anyway?</span>
+            <button
+              onClick={async () => {
+                await saveAllDrafts()
+                setShowLeaveWarning(false)
+                pendingLeave.current?.()
+              }}
+              disabled={saving}
+              className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
+            >{saving ? 'Saving…' : 'Save all & leave'}</button>
+            <button
+              onClick={() => { setShowLeaveWarning(false); pendingLeave.current?.() }}
+              className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium"
+            >Discard & leave</button>
+            <button
+              onClick={() => { setShowLeaveWarning(false); pendingLeave.current = null }}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >Stay</button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading screen — shown until files are ready */}
+      {filesLoading && (
+        <div className="fixed inset-0 z-40 bg-white flex items-center justify-center">
+          <p className="text-sm text-gray-400">Loading workspace…</p>
+        </div>
+      )}
       <div className="flex h-screen bg-white overflow-hidden">
 
         {/* Sidebar */}
@@ -409,14 +507,18 @@ export default function WorkspacePage() {
           {showNewFile && (
             <div className="p-2 border-b border-gray-200 flex gap-1">
               <input
-                className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
                 placeholder="name.psc"
                 value={newFileName}
                 onChange={e => setNewFileName(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && createFile()}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') createFile()
+                  if (e.key === 'Escape') { setShowNewFile(false); setNewFileName('') }
+                }}
                 autoFocus
               />
-              <button onClick={createFile} className="text-xs bg-blue-600 text-white px-2 rounded hover:bg-blue-700">OK</button>
+              <button onClick={createFile} className="text-xs bg-blue-600 text-white px-2 rounded hover:bg-blue-700 flex-shrink-0">OK</button>
+              <button onClick={() => { setShowNewFile(false); setNewFileName('') }} className="text-xs bg-gray-100 hover:bg-gray-200 px-2 rounded flex-shrink-0">✕</button>
             </div>
           )}
 
@@ -468,7 +570,12 @@ export default function WorkspacePage() {
                           setRenameValue(f.name)
                         }}
                         title="Double-click to rename"
-                      >{f.name}</span>
+                      >
+                        {f.name}
+                        {(dirtyIds.has(f.id) || (activeFile?.id === f.id && code !== (vfsMirror.current[f.name] ?? activeFile.content))) && (
+                          <span className="ml-1 text-yellow-500" title="Unsaved changes">●</span>
+                        )}
+                      </span>
                     )}
                     <button
                       onClick={e => { e.stopPropagation(); setConfirmDeleteFileId(f.id) }}
@@ -481,15 +588,20 @@ export default function WorkspacePage() {
           </div>
 
           <div className="p-3 border-t border-gray-200 space-y-1.5">
-            <Link href="/" className="block text-xs text-center text-gray-500 hover:text-gray-700">← Workspaces</Link>
-            <form action="/api/auth/logout" method="POST">
+            <button
+              onClick={() => safeNavigate(() => router.push('/'))}
+              className="block w-full text-xs text-center text-gray-500 hover:text-gray-700"
+            >← Workspaces</button>
+            <form action="/api/auth/logout" method="POST" onSubmit={e => {
+              if (hasDirtyFiles()) { e.preventDefault(); safeNavigate(() => (e.target as HTMLFormElement).submit()) }
+            }}>
               <button type="submit" className="w-full text-xs text-center text-gray-400 hover:text-gray-600">Sign out</button>
             </form>
           </div>
         </div>
 
         {/* Editor + Console */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
           {/* Toolbar */}
           <div className="h-10 border-b border-gray-200 flex items-center px-3 gap-2 bg-white flex-shrink-0">
             <span className="text-sm font-mono text-gray-600 flex-1 truncate">
@@ -528,16 +640,18 @@ export default function WorkspacePage() {
             >{running ? '⏳ Running…' : '▶ Run'}</button>
           </div>
 
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden min-h-0">
             {/* Code editor */}
-            <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-200">
-              <div className="flex flex-1 overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-200 min-h-0">
+              {/* Single scrolling container — line numbers and textarea scroll together */}
+              <div className="flex flex-1 overflow-auto min-h-0 bg-gray-50">
                 <div
-                  ref={lineNumRef}
-                  className="w-10 bg-gray-100 text-gray-400 text-right text-xs font-mono pt-2.5 pr-2 overflow-hidden select-none flex-shrink-0"
-                  style={{ lineHeight: '21px' }}
+                  className="bg-gray-100 text-gray-400 text-right text-xs font-mono select-none flex-shrink-0 pt-2.5 pr-2 pl-1"
+                  style={{ lineHeight: '21px', minWidth: '2.5rem', height: `${lineCount * 21 + 20}px`, minHeight: '100%' }}
                 >
-                  {Array.from({ length: lineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
+                  {Array.from({ length: lineCount }, (_, i) => (
+                    <div key={i}>{i + 1}</div>
+                  ))}
                 </div>
                 <textarea
                   ref={inputBoxRef}
@@ -545,11 +659,15 @@ export default function WorkspacePage() {
                   value={code}
                   onChange={e => setCode(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  onScroll={() => { if (lineNumRef.current && inputBoxRef.current) lineNumRef.current.scrollTop = inputBoxRef.current.scrollTop }}
                   spellCheck={false}
                   placeholder="Enter pseudocode here…"
                   className="flex-1 resize-none font-mono text-sm bg-gray-50 text-gray-800 p-2.5 focus:outline-none"
-                  style={{ lineHeight: '21px' }}
+                  style={{
+                    lineHeight: '21px',
+                    overflow: 'hidden',
+                    minHeight: '100%',
+                    height: `${lineCount * 21 + 20}px`,
+                  }}
                 />
               </div>
             </div>
