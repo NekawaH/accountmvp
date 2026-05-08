@@ -18,6 +18,7 @@ interface LoadedFile extends PseudoFile {
 const EXAMPLES = [
   {
     label: 'Bubble Sort',
+    filename: 'bubble_sort.psc',
     code: `DECLARE Values : ARRAY[1:100] OF REAL
 
 PROCEDURE SwapValue(BYREF X : REAL, Y : REAL)
@@ -47,6 +48,7 @@ NEXT Index`,
   },
   {
     label: 'Factorial',
+    filename: 'factorial.psc',
     code: `FUNCTION F(X:INTEGER) RETURNS INTEGER
     IF X = 0 THEN
         RETURN 1
@@ -60,6 +62,7 @@ OUTPUT F(N)`,
   },
   {
     label: 'Linear Search',
+    filename: 'linear_search.psc',
     code: `DECLARE Values : ARRAY[1:100] OF INTEGER
 INPUT N
 FOR Index <- 1 TO N
@@ -81,6 +84,7 @@ ENDIF`,
   },
   {
     label: 'File Handling',
+    filename: 'file_handling.psc',
     code: `PROCEDURE PrintFile(File:STRING)
     OPENFILE File FOR READ
     WHILE NOT EOF(File) DO
@@ -119,6 +123,10 @@ export default function WorkspacePage() {
   const [lineCount, setLineCount] = useState(1)
   const [showPrompts, setShowPrompts] = useState(true)
   const [workspaceName, setWorkspaceName] = useState('')
+  // Rename state: which file id is being renamed, and the draft value
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null)
   const inputBoxRef = useRef<HTMLTextAreaElement>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
   const consoleRef = useRef<HTMLDivElement>(null)
@@ -131,7 +139,6 @@ export default function WorkspacePage() {
     if (!res.ok) { router.push('/'); return }
     let list: PseudoFile[] = await res.json()
 
-    // Create main.psc if it doesn't exist yet
     if (!list.find(f => f.name === 'main.psc')) {
       const created = await fetch('/api/files', {
         method: 'POST',
@@ -183,15 +190,35 @@ export default function WorkspacePage() {
     setCode(content)
   }
 
+  // Save current file. If unsaved, prompt for a name.
   async function saveFile() {
-    if (!activeFile) return
-    setSaving(true)
-    await fetch(`/api/files/${activeFile.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: code }),
-    })
-    setSaving(false)
+    if (activeFile) {
+      setSaving(true)
+      await fetch(`/api/files/${activeFile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: code }),
+      })
+      vfsMirror.current[activeFile.name] = code
+      setSaving(false)
+    } else {
+      // Unsaved buffer — ask for a name then create
+      let name = prompt('Save as (e.g. my_program.psc):')?.trim()
+      if (!name) return
+      if (!name.endsWith('.psc') && !name.endsWith('.txt')) name += '.psc'
+      setSaving(true)
+      const res = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, name, content: code }),
+      })
+      setSaving(false)
+      if (res.ok) {
+        const created: LoadedFile = await res.json()
+        await loadFileList()
+        setActiveFile(created)
+      }
+    }
   }
 
   async function createFile() {
@@ -214,16 +241,52 @@ export default function WorkspacePage() {
   }
 
   async function deleteFile(f: PseudoFile) {
-    if (!confirm(`Delete "${f.name}"?`)) return
     await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
     if (activeFile?.id === f.id) { setActiveFile(null); setCode('') }
+    setConfirmDeleteFileId(null)
     await loadFileList()
   }
 
-  function loadExample(exCode: string) {
-    setCode(exCode)
-    setActiveFile(null)
+  // Load example: create/upsert the file in DB with its slug name
+  async function loadExample(filename: string, exCode: string) {
     setShowExamples(false)
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId, name: filename, content: exCode }),
+    })
+    if (res.ok) {
+      const created: LoadedFile = await res.json()
+      vfsMirror.current[filename] = exCode
+      await loadFileList()
+      setActiveFile(created)
+      setCode(exCode)
+    }
+  }
+
+  // Rename: commit the new name
+  async function commitRename(f: PseudoFile) {
+    let name = renameValue.trim()
+    setRenamingId(null)
+    if (!name || name === f.name) return
+    if (!name.endsWith('.psc') && !name.endsWith('.txt')) name += '.psc'
+
+    // Create new file with same content, delete old one
+    const content = vfsMirror.current[f.name] ?? ''
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId, name, content }),
+    })
+    if (!res.ok) return
+    const created: LoadedFile = await res.json()
+    await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
+    delete vfsMirror.current[f.name]
+    vfsMirror.current[name] = content
+    await loadFileList()
+    if (activeFile?.id === f.id) {
+      setActiveFile(created)
+    }
   }
 
   async function runCode() {
@@ -235,6 +298,7 @@ export default function WorkspacePage() {
     }
     if (consoleRef.current) consoleRef.current.textContent = ''
 
+    // Autosave active file before running
     if (activeFile && activeFile.name.endsWith('.psc')) {
       await fetch(`/api/files/${activeFile.id}`, {
         method: 'PUT',
@@ -363,14 +427,55 @@ export default function WorkspacePage() {
             {files.map(f => (
               <div
                 key={f.id}
-                className={`flex items-center justify-between px-3 py-1.5 cursor-pointer text-sm group ${activeFile?.id === f.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
-                onClick={() => openFile(f)}
+                className={`px-2 py-1.5 text-sm group ${activeFile?.id === f.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
               >
-                <span className="truncate">{f.name}</span>
-                <button
-                  onClick={e => { e.stopPropagation(); deleteFile(f) }}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 ml-1 text-xs"
-                >✕</button>
+                {confirmDeleteFileId === f.id ? (
+                  <div className="flex items-center gap-1">
+                    <span className="truncate flex-1 text-xs text-gray-600">Delete <span className="font-medium">{f.name}</span>?</span>
+                    <button
+                      onClick={() => deleteFile(f)}
+                      className="text-xs px-1.5 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded font-medium flex-shrink-0"
+                    >Yes</button>
+                    <button
+                      onClick={() => setConfirmDeleteFileId(null)}
+                      className="text-xs px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded font-medium flex-shrink-0"
+                    >No</button>
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-center justify-between cursor-pointer"
+                    onClick={() => renamingId !== f.id && openFile(f)}
+                  >
+                    {renamingId === f.id ? (
+                      <input
+                        className="flex-1 text-xs border border-blue-400 rounded px-1 py-0.5 focus:outline-none min-w-0"
+                        value={renameValue}
+                        autoFocus
+                        onChange={e => setRenameValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') commitRename(f)
+                          if (e.key === 'Escape') setRenamingId(null)
+                        }}
+                        onBlur={() => commitRename(f)}
+                        onClick={e => e.stopPropagation()}
+                      />
+                    ) : (
+                      <span
+                        className="truncate flex-1"
+                        onDoubleClick={e => {
+                          e.stopPropagation()
+                          setRenamingId(f.id)
+                          setRenameValue(f.name)
+                        }}
+                        title="Double-click to rename"
+                      >{f.name}</span>
+                    )}
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmDeleteFileId(f.id) }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 ml-1 text-xs flex-shrink-0"
+                    >✕</button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -408,18 +513,16 @@ export default function WorkspacePage() {
               {showExamples && (
                 <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded shadow-lg w-44">
                   {EXAMPLES.map(ex => (
-                    <button key={ex.label} onClick={() => loadExample(ex.code)}
+                    <button key={ex.label} onClick={() => loadExample(ex.filename, ex.code)}
                       className="block w-full text-left text-sm px-3 py-2 hover:bg-gray-50"
                     >{ex.label}</button>
                   ))}
                 </div>
               )}
             </div>
-            {activeFile && (
-              <button onClick={saveFile} disabled={saving}
-                className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
-              >{saving ? 'Saving…' : 'Save'}</button>
-            )}
+            <button onClick={saveFile} disabled={saving}
+              className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+            >{saving ? 'Saving…' : 'Save'}</button>
             <button onClick={runCode} disabled={running}
               className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-semibold"
             >{running ? '⏳ Running…' : '▶ Run'}</button>

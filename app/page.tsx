@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   async function loadWorkspaces() {
     const res = await fetch('/api/workspaces')
@@ -48,10 +49,10 @@ export default function DashboardPage() {
     }
   }
 
-  async function deleteWorkspace(ws: Workspace) {
-    if (!confirm(`Delete workspace "${ws.name}"? This will delete all its files.`)) return
-    await fetch(`/api/workspaces/${ws.id}`, { method: 'DELETE' })
-    setWorkspaces(prev => prev.filter(w => w.id !== ws.id))
+  async function deleteWorkspace(id: string) {
+    await fetch(`/api/workspaces/${id}`, { method: 'DELETE' })
+    setWorkspaces(prev => prev.filter(w => w.id !== id))
+    setConfirmDeleteId(null)
   }
 
   return (
@@ -129,32 +130,56 @@ export default function DashboardPage() {
             {workspaces.map(ws => (
               <div
                 key={ws.id}
-                className="bg-white border border-gray-200 rounded-xl px-5 py-4 flex items-center justify-between shadow-sm hover:border-blue-300 hover:shadow transition-all group"
+                className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm hover:border-blue-300 hover:shadow transition-all group"
               >
-                <button
-                  onClick={() => router.push(`/workspace/${ws.id}`)}
-                  className="flex-1 text-left"
-                >
-                  <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors">{ws.name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Created {new Date(ws.createdAt).toLocaleDateString()}
-                  </p>
-                </button>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => router.push(`/workspace/${ws.id}`)}
-                    className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Open
-                  </button>
-                  <button
-                    onClick={() => deleteWorkspace(ws)}
-                    className="text-xs px-2.5 py-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                    title="Delete workspace"
-                  >
-                    ✕
-                  </button>
-                </div>
+                {confirmDeleteId === ws.id ? (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-700">
+                      Delete <span className="font-medium">{ws.name}</span> and all its files?
+                    </p>
+                    <div className="flex gap-2 ml-4 flex-shrink-0">
+                      <button
+                        onClick={() => deleteWorkspace(ws.id)}
+                        className="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => router.push(`/workspace/${ws.id}`)}
+                      className="flex-1 text-left"
+                    >
+                      <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors">{ws.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        Created {new Date(ws.createdAt).toLocaleDateString()}
+                      </p>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => router.push(`/workspace/${ws.id}`)}
+                        className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
+                      >
+                        Open
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(ws.id)}
+                        className="text-xs px-2.5 py-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete workspace"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
