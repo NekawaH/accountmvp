@@ -408,7 +408,6 @@ export default function WorkspacePage() {
       if (terminalRef.current) terminalRef.current.value = 'Error: interpreter not loaded yet, try again.'
       return
     }
-    if (terminalRef.current) { terminalRef.current.value = ''; protectedLenRef.current = 0 }
     terminatedRef.current = false
 
     // Autosave active file before running

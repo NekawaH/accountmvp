@@ -112,7 +112,6 @@ export default function PublicWorkspacePage() {
       return
     }
     terminatedRef.current = false
-    if (terminalRef.current) { terminalRef.current.value = ''; protectedLenRef.current = 0 }
     w.vfs = { ...vfsMirror.current }
     setRunning(true)
     try {
