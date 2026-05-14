@@ -246,20 +246,24 @@ export default function DashboardPage() {
                         <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors truncate">{ws.name}</p>
                         {ws.isPublic && ws._count && ws._count.forks > 0 && <span className="text-xs text-gray-400 flex-shrink-0">⑂ {ws._count.forks}</span>}
                       </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <p className="text-xs text-gray-400">Created {new Date(ws.createdAt).toLocaleDateString()}</p>
-                        {ws.collaborators && ws.collaborators.length > 0 && (
-                          <div className="flex items-center">
-                            {ws.collaborators.slice(0, 4).map((c, i) => (
-                              c.user.avatarUrl
-                                // eslint-disable-next-line @next/next/no-img-element
-                                ? <img key={i} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-4 h-4 rounded-full object-cover ring-1 ring-white -ml-0.5 first:ml-0" />
-                                : <div key={i} title={c.user.username} className="w-4 h-4 rounded-full bg-gray-300 ring-1 ring-white -ml-0.5 first:ml-0" />
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">Created {new Date(ws.createdAt).toLocaleDateString()}</p>
                     </button>
+                    {/* Contributor avatars */}
+                    <div className="flex items-center flex-shrink-0 mx-3">
+                      <div className="relative">
+                        {profile?.avatarUrl
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={profile.avatarUrl} alt={profile.username} title={`${profile.username} (owner)`} className="w-7 h-7 rounded-full object-cover ring-2 ring-yellow-400" />
+                          : <div className="w-7 h-7 rounded-full bg-gray-200 ring-2 ring-yellow-400" />}
+                        <span className="absolute -top-1.5 -right-1 text-[9px] leading-none select-none">👑</span>
+                      </div>
+                      {ws.collaborators?.slice(0, 3).map((c, i) => (
+                        c.user.avatarUrl
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img key={i} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-6 h-6 rounded-full object-cover ring-2 ring-white -ml-1.5" />
+                          : <div key={i} title={c.user.username} className="w-6 h-6 rounded-full bg-gray-300 ring-2 ring-white -ml-1.5" />
+                      ))}
+                    </div>
                     <div className="flex items-center gap-2 ml-3 flex-shrink-0">
                       {/* Public/private toggle */}
                       <button
