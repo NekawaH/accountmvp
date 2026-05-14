@@ -1,7 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { sendVerificationEmail } from '@/lib/email'
 import bcrypt from 'bcryptjs'
-import crypto from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
 
 const ADJECTIVES = ['swift','brave','calm','bold','keen','bright','cool','dark','fair','glad','gold','grey','iron','jade','kind','lime','mint','navy','oak','pine','red','rose','sage','sky','star','teal','warm','wild','wise','zeal']
@@ -30,8 +28,6 @@ export async function POST(req: NextRequest) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12)
-  const verifyToken = crypto.randomBytes(32).toString('hex')
-  const verifyTokenExp = new Date(Date.now() + 24 * 60 * 60 * 1000)
 
   // Generate a unique username
   let username = generateUsername()
@@ -43,10 +39,8 @@ export async function POST(req: NextRequest) {
   const avatarUrl = `https://api.dicebear.com/8.x/thumbs/svg?seed=${encodeURIComponent(username)}`
 
   await prisma.user.create({
-    data: { email, passwordHash, verifyToken, verifyTokenExp, username, avatarUrl },
+    data: { email, passwordHash, emailVerified: true, username, avatarUrl },
   })
-
-  await sendVerificationEmail(email, verifyToken)
 
   return NextResponse.json({ ok: true }, { status: 201 })
 }
