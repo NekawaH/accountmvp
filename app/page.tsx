@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 interface Workspace { id: string; name: string; createdAt: string; isPublic: boolean }
 interface Profile { username: string; avatarUrl: string }
 interface UserResult { username: string; avatarUrl: string }
+interface WorkspaceResult { id: string; name: string; user: { username: string; avatarUrl: string } }
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -19,7 +20,8 @@ export default function DashboardPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   // Search
   const [searchQ, setSearchQ] = useState('')
-  const [searchResults, setSearchResults] = useState<UserResult[]>([])
+  const [userResults, setUserResults] = useState<UserResult[]>([])
+  const [workspaceResults, setWorkspaceResults] = useState<WorkspaceResult[]>([])
   const [searching, setSearching] = useState(false)
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -28,14 +30,19 @@ export default function DashboardPage() {
     fetch('/api/profile').then(r => r.ok ? r.json() : null).then(setProfile)
   }, [])
 
-  // Debounced user search
+  // Debounced search (users + workspaces)
   useEffect(() => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current)
-    if (searchQ.trim().length < 2) { setSearchResults([]); return }
+    if (searchQ.trim().length < 2) { setUserResults([]); setWorkspaceResults([]); return }
     searchTimeout.current = setTimeout(async () => {
       setSearching(true)
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(searchQ.trim())}`)
-      setSearchResults(res.ok ? await res.json() : [])
+      const q = encodeURIComponent(searchQ.trim())
+      const [usersRes, wsRes] = await Promise.all([
+        fetch(`/api/users/search?q=${q}`),
+        fetch(`/api/workspaces/search?q=${q}`),
+      ])
+      setUserResults(usersRes.ok ? await usersRes.json() : [])
+      setWorkspaceResults(wsRes.ok ? await wsRes.json() : [])
       setSearching(false)
     }, 300)
   }, [searchQ])
@@ -112,32 +119,58 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* User search */}
+        {/* Search */}
         <div className="relative mb-6">
           <input
             type="text"
-            placeholder="Search users by username…"
+            placeholder="Search users or workspaces…"
             value={searchQ}
             onChange={e => setSearchQ(e.target.value)}
-            onBlur={() => setTimeout(() => setSearchResults([]), 200)}
+            onBlur={() => setTimeout(() => { setUserResults([]); setWorkspaceResults([]) }, 200)}
             className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
           />
-          {(searchResults.length > 0 || searching) && (
+          {(userResults.length > 0 || workspaceResults.length > 0 || searching) && (
             <div className="absolute top-full mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg z-10 overflow-hidden">
               {searching && <p className="text-xs text-gray-400 px-4 py-3">Searching…</p>}
-              {searchResults.map(u => (
-                <button
-                  key={u.username}
-                  onMouseDown={() => router.push(`/users/${u.username}`)}
-                  className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-50 text-left"
-                >
-                  {u.avatarUrl
-                    // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={u.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
-                    : <div className="w-7 h-7 rounded-full bg-gray-200" />}
-                  <span className="text-sm font-medium text-gray-800">{u.username}</span>
-                </button>
-              ))}
+              {userResults.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-gray-400 px-4 pt-2.5 pb-1 uppercase tracking-wide">Users</p>
+                  {userResults.map(u => (
+                    <button
+                      key={u.username}
+                      onMouseDown={() => router.push(`/users/${u.username}`)}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-50 text-left"
+                    >
+                      {u.avatarUrl
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={u.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
+                        : <div className="w-7 h-7 rounded-full bg-gray-200" />}
+                      <span className="text-sm font-medium text-gray-800">{u.username}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+              {workspaceResults.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-gray-400 px-4 pt-2.5 pb-1 uppercase tracking-wide">Public Workspaces</p>
+                  {workspaceResults.map(ws => (
+                    <button
+                      key={ws.id}
+                      onMouseDown={() => router.push(`/users/${ws.user.username}/workspace/${ws.id}`)}
+                      className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-50 text-left"
+                    >
+                      {ws.user.avatarUrl
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={ws.user.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
+                        : <div className="w-7 h-7 rounded-full bg-gray-200" />}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 truncate">{ws.name}</p>
+                        <p className="text-xs text-gray-400">{ws.user.username}</p>
+                      </div>
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

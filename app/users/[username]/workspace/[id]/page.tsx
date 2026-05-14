@@ -19,6 +19,7 @@ export default function PublicWorkspacePage() {
   const [running, setRunning] = useState(false)
   const [showPrompts, setShowPrompts] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [consoleWidth, setConsoleWidth] = useState(320)
 
   const terminalRef = useRef<HTMLTextAreaElement>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
@@ -208,8 +209,22 @@ export default function PublicWorkspacePage() {
               </div>
             </div>
 
+            {/* Drag handle */}
+            <div
+              className="w-1 flex-shrink-0 cursor-col-resize bg-gray-200 hover:bg-blue-400 active:bg-blue-500 transition-colors"
+              onMouseDown={e => {
+                e.preventDefault()
+                const startX = e.clientX
+                const startW = consoleWidth
+                const onMove = (ev: MouseEvent) => setConsoleWidth(Math.max(180, Math.min(800, startW - (ev.clientX - startX))))
+                const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp) }
+                window.addEventListener('mousemove', onMove)
+                window.addEventListener('mouseup', onUp)
+              }}
+            />
+
             {/* Console */}
-            <div className="w-80 flex-shrink-0 flex flex-col bg-white">
+            <div className="flex-shrink-0 flex flex-col bg-white" style={{ width: consoleWidth }}>
               <div className="px-3 py-1.5 bg-gray-100 border-b border-gray-200 flex justify-between items-center">
                 <span className="text-xs font-medium text-gray-600">Console</span>
                 <button onClick={() => { if (terminalRef.current) { terminalRef.current.value = ''; protectedLenRef.current = 0 } }} className="text-xs text-gray-400 hover:text-gray-600">Clear</button>
