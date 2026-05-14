@@ -6,7 +6,7 @@ import Script from 'next/script'
 
 interface PseudoFile { id: string; name: string; updatedAt: string }
 interface LoadedFile extends PseudoFile { content: string }
-interface WorkspaceInfo { id: string; name: string; user: { username: string; avatarUrl: string } }
+interface WorkspaceInfo { id: string; name: string; user: { username: string; avatarUrl: string }; _count: { forks: number } }
 
 export default function PublicWorkspacePage() {
   const { username, id: workspaceId } = useParams<{ username: string; id: string }>()
@@ -17,6 +17,7 @@ export default function PublicWorkspacePage() {
   const [activeFile, setActiveFile] = useState<LoadedFile | null>(null)
   const [code, setCode] = useState('')
   const [running, setRunning] = useState(false)
+  const [forking, setForking] = useState(false)
   const [showPrompts, setShowPrompts] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [consoleWidth, setConsoleWidth] = useState(320)
@@ -123,6 +124,17 @@ export default function PublicWorkspacePage() {
     }
   }
 
+  async function forkWorkspace() {
+    setForking(true)
+    const res = await fetch(`/api/workspaces/${workspaceId}/fork`, { method: 'POST' })
+    if (res.ok) {
+      const { id } = await res.json()
+      router.push(`/workspace/${id}`)
+    } else {
+      setForking(false)
+    }
+  }
+
   if (notFound) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -152,7 +164,10 @@ export default function PublicWorkspacePage() {
               </button>
             )}
             <p className="text-xs text-gray-500 mt-1.5 truncate font-semibold">{ws?.name}</p>
-            <span className="inline-block mt-1 text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">Public · Read-only</span>
+            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">Public · Read-only</span>
+              {ws && <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">⑂ {ws._count.forks}</span>}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -183,6 +198,9 @@ export default function PublicWorkspacePage() {
               <input id="showPrompts" type="checkbox" checked={showPrompts} onChange={e => setShowPrompts(e.target.checked)} className="accent-blue-600" />
               Show prompts
             </label>
+            <button onClick={forkWorkspace} disabled={forking}
+              className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded font-semibold border border-gray-300"
+            >{forking ? 'Forking…' : '⑂ Fork'}</button>
             <button onClick={runCode} disabled={running}
               className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-semibold"
             >{running ? '⏳ Running…' : '▶ Run'}</button>

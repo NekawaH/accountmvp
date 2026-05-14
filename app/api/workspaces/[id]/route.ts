@@ -11,7 +11,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // Allow public workspace to be fetched without auth
   const ws = await prisma.workspace.findUnique({
     where: { id: params.id },
-    include: { user: { select: { username: true, avatarUrl: true } } },
+    include: { user: { select: { username: true, avatarUrl: true } }, _count: { select: { forks: true } } },
   })
   if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (!ws.isPublic) {

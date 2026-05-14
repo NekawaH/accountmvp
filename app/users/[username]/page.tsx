@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 interface UserProfile { username: string; avatarUrl: string }
-interface Workspace { id: string; name: string; createdAt: string }
+interface Workspace { id: string; name: string; createdAt: string; _count: { forks: number } }
 
 export default function UserProfilePage() {
   const { username } = useParams<{ username: string }>()
@@ -64,7 +64,10 @@ export default function UserProfilePage() {
                 onClick={() => router.push(`/users/${username}/workspace/${ws.id}`)}
                 className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm hover:border-blue-300 hover:shadow transition-all cursor-pointer group"
               >
-                <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors">{ws.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors">{ws.name}</p>
+                  {ws._count.forks > 0 && <span className="text-xs text-gray-400">⑂ {ws._count.forks}</span>}
+                </div>
                 <p className="text-xs text-gray-400 mt-0.5">Created {new Date(ws.createdAt).toLocaleDateString()}</p>
               </div>
             ))}
