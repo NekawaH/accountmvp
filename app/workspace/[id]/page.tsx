@@ -143,11 +143,11 @@ export default function WorkspacePage() {
   const vfsMirror = useRef<Record<string, string>>({})
 
   const loadFileList = useCallback(async () => {
-    const res = await fetch(`/api/files?workspaceId=${workspaceId}`)
+    const res = await fetch(`/api/files?workspaceId=${workspaceId}&withContent=true`)
     if (!res.ok) { router.push('/'); return }
-    let list: PseudoFile[] = await res.json()
+    let entries: LoadedFile[] = await res.json()
 
-    if (!list.find(f => f.name === 'main.psc')) {
+    if (!entries.find(f => f.name === 'main.psc')) {
       const created = await fetch('/api/files', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -155,14 +155,11 @@ export default function WorkspacePage() {
       })
       if (created.ok) {
         const newFile: LoadedFile = await created.json()
-        list = [newFile, ...list]
+        entries = [newFile, ...entries]
       }
     }
 
-    setFiles(list)
-    const entries = await Promise.all(
-      list.map(f => fetch(`/api/files/${f.id}`).then(r => r.json()) as Promise<LoadedFile>)
-    )
+    setFiles(entries)
     const vfs: Record<string, string> = {}
     for (const f of entries) vfs[f.name] = f.content
     vfsMirror.current = vfs
@@ -281,24 +278,24 @@ export default function WorkspacePage() {
 
   async function saveAllDrafts() {
     setSaving(true)
-    for (const [fileId, content] of Object.entries(drafts.current)) {
-      await fetch(`/api/files/${fileId}`, {
+    const saves = Object.entries(drafts.current).map(([fileId, content]) => {
+      const file = files.find(f => f.id === fileId)
+      if (file) vfsMirror.current[file.name] = content
+      return fetch(`/api/files/${fileId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content }),
       })
-      const file = files.find(f => f.id === fileId)
-      if (file) vfsMirror.current[file.name] = content
-    }
-    // Also save current active file
+    })
     if (activeFile) {
-      await fetch(`/api/files/${activeFile.id}`, {
+      vfsMirror.current[activeFile.name] = code
+      saves.push(fetch(`/api/files/${activeFile.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: code }),
-      })
-      vfsMirror.current[activeFile.name] = code
+      }))
     }
+    await Promise.all(saves)
     drafts.current = {}
     setDirtyIds(new Set())
     setSaving(false)
@@ -315,9 +312,10 @@ export default function WorkspacePage() {
     })
     if (res.ok) {
       const created: LoadedFile = await res.json()
+      vfsMirror.current[name] = ''
+      setFiles(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
       setNewFileName('')
       setShowNewFile(false)
-      await loadFileList()
       setActiveFile(created)
       setCode('')
     }
@@ -342,9 +340,10 @@ export default function WorkspacePage() {
     await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
     if (activeFile?.id === f.id) { setActiveFile(null); setCode('') }
     delete drafts.current[f.id]
+    delete vfsMirror.current[f.name]
     setDirtyIds(prev => { const next = new Set(prev); next.delete(f.id); return next })
     setConfirmDeleteFileId(null)
-    await loadFileList()
+    setFiles(prev => prev.filter(x => x.id !== f.id))
   }
 
   // Load example: create/upsert the file in DB with its slug name
@@ -358,7 +357,10 @@ export default function WorkspacePage() {
     if (res.ok) {
       const created: LoadedFile = await res.json()
       vfsMirror.current[filename] = exCode
-      await loadFileList()
+      setFiles(prev => {
+        const without = prev.filter(f => f.name !== filename)
+        return [...without, created].sort((a, b) => a.name.localeCompare(b.name))
+      })
       setActiveFile(created)
       setCode(exCode)
     }
@@ -383,7 +385,7 @@ export default function WorkspacePage() {
     await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
     delete vfsMirror.current[f.name]
     vfsMirror.current[name] = content
-    await loadFileList()
+    setFiles(prev => prev.filter(x => x.id !== f.id).concat(created).sort((a, b) => a.name.localeCompare(b.name)))
     if (activeFile?.id === f.id) {
       setActiveFile(created)
     }
@@ -410,14 +412,14 @@ export default function WorkspacePage() {
     }
     terminatedRef.current = false
 
-    // Autosave active file before running
+    // Autosave active file before running (fire-and-forget)
     if (activeFile && activeFile.name.endsWith('.psc')) {
-      await fetch(`/api/files/${activeFile.id}`, {
+      vfsMirror.current[activeFile.name] = code
+      fetch(`/api/files/${activeFile.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: code }),
       })
-      vfsMirror.current[activeFile.name] = code
     }
 
     const before = { ...vfsMirror.current }
@@ -427,19 +429,16 @@ export default function WorkspacePage() {
     try {
       await w.pseudoIDE.run(code, null)
       const after: Record<string, string> = w.vfs
-      const changed: string[] = []
-      for (const [name, content] of Object.entries(after)) {
-        if (before[name] !== content) {
-          changed.push(name)
-          await fetch('/api/files', {
+      const changedEntries = Object.entries(after).filter(([name, content]) => before[name] !== content)
+      if (changedEntries.length > 0) {
+        await Promise.all(changedEntries.map(([name, content]) => {
+          vfsMirror.current[name] = content
+          return fetch('/api/files', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ workspaceId, name, content }),
           })
-          vfsMirror.current[name] = content
-        }
-      }
-      if (changed.length > 0) {
+        }))
         const res = await fetch(`/api/files?workspaceId=${workspaceId}`)
         if (res.ok) setFiles(await res.json())
       }

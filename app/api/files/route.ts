@@ -21,9 +21,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const withContent = req.nextUrl.searchParams.get('withContent') === 'true'
   const files = await prisma.pseudoFile.findMany({
     where: { workspaceId },
-    select: { id: true, name: true, updatedAt: true },
+    select: { id: true, name: true, updatedAt: true, ...(withContent ? { content: true } : {}) },
     orderBy: { name: 'asc' },
   })
   return NextResponse.json(files)

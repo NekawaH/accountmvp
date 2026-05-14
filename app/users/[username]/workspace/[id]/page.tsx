@@ -43,14 +43,11 @@ export default function PublicWorkspacePage() {
     if (wsData.user.username !== username) { setNotFound(true); return }
     setWs(wsData)
 
-    const filesRes = await fetch(`/api/files?workspaceId=${workspaceId}`)
+    const filesRes = await fetch(`/api/files?workspaceId=${workspaceId}&withContent=true`)
     if (!filesRes.ok) { setNotFound(true); return }
-    const list: PseudoFile[] = await filesRes.json()
-    setFiles(list)
+    const entries: LoadedFile[] = await filesRes.json()
+    setFiles(entries)
 
-    const entries = await Promise.all(
-      list.map(f => fetch(`/api/files/${f.id}`).then(r => r.json()) as Promise<LoadedFile>)
-    )
     const vfs: Record<string, string> = {}
     for (const f of entries) vfs[f.name] = f.content
     vfsMirror.current = vfs
