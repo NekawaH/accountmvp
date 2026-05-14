@@ -20,9 +20,12 @@ export default function PublicWorkspacePage() {
   const [showPrompts, setShowPrompts] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
-  const consoleRef = useRef<HTMLDivElement>(null)
-  const consoleInputRef = useRef<HTMLInputElement>(null)
+  const terminalRef = useRef<HTMLTextAreaElement>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
+  const protectedLenRef = useRef(0)
+  const inputHandlerRef = useRef<((e: any) => void) | null>(null)
+  const awaitingInputRef = useRef(false)
+  const terminatedRef = useRef(false)
   const interpreterReady = useRef(false)
   const vfsMirror = useRef<Record<string, string>>({})
 
@@ -61,8 +64,37 @@ export default function PublicWorkspacePage() {
 
   function initInterpreter() {
     const w = window as any
-    if (interpreterReady.current || !w.pseudoIDE || !consoleRef.current || !consoleInputRef.current) return
-    w.pseudoIDE.init(consoleRef.current, consoleInputRef.current, document.getElementById('showPrompts'))
+    if (interpreterReady.current || !w.pseudoIDE || !terminalRef.current) return
+
+    const ta = terminalRef.current
+
+    const outputEl = {
+      get textContent() { return ta.value },
+      set textContent(v: string) {
+        ta.value = v
+        protectedLenRef.current = v.length
+        ta.scrollTop = ta.scrollHeight
+      },
+      get scrollTop() { return ta.scrollTop },
+      set scrollTop(v: number) { ta.scrollTop = v },
+      get scrollHeight() { return ta.scrollHeight },
+    }
+
+    const inputEl: any = {
+      value: '',
+      focus() {
+        if (terminatedRef.current) throw new Error('Terminated')
+        awaitingInputRef.current = true
+        ta.focus()
+        ta.selectionStart = ta.selectionEnd = ta.value.length
+      },
+      addEventListener(_event: string, handler: (e: any) => void) {
+        inputHandlerRef.current = handler
+      },
+    }
+    w._termInputEl = inputEl
+
+    w.pseudoIDE.init(outputEl, inputEl)
     interpreterReady.current = true
   }
 
@@ -76,17 +108,20 @@ export default function PublicWorkspacePage() {
     initInterpreter()
     const w = window as any
     if (!w.pseudoIDE) {
-      if (consoleRef.current) consoleRef.current.textContent = 'Error: interpreter not loaded yet, try again.'
+      if (terminalRef.current) terminalRef.current.value = 'Error: interpreter not loaded yet, try again.'
       return
     }
-    if (consoleRef.current) consoleRef.current.textContent = ''
+    terminatedRef.current = false
+    if (terminalRef.current) { terminalRef.current.value = ''; protectedLenRef.current = 0 }
     w.vfs = { ...vfsMirror.current }
     setRunning(true)
     try {
       await w.pseudoIDE.run(code, null)
     } catch (err: any) {
-      if (consoleRef.current) consoleRef.current.textContent += '\nError: ' + err.message
+      if (terminalRef.current) terminalRef.current.value += '\nError: ' + err.message
     } finally {
+      terminatedRef.current = true
+      awaitingInputRef.current = false
       setRunning(false)
     }
   }
@@ -181,19 +216,41 @@ export default function PublicWorkspacePage() {
             <div className="w-80 flex-shrink-0 flex flex-col bg-white">
               <div className="px-3 py-1.5 bg-gray-100 border-b border-gray-200 flex justify-between items-center">
                 <span className="text-xs font-medium text-gray-600">Console</span>
-                <button onClick={() => { if (consoleRef.current) consoleRef.current.textContent = '' }} className="text-xs text-gray-400 hover:text-gray-600">Clear</button>
+                <button onClick={() => { if (terminalRef.current) { terminalRef.current.value = ''; protectedLenRef.current = 0 } }} className="text-xs text-gray-400 hover:text-gray-600">Clear</button>
               </div>
-              <div ref={consoleRef} className="flex-1 overflow-y-auto font-mono text-sm p-2.5 whitespace-pre-wrap bg-white text-gray-800" style={{ lineHeight: '21px' }} />
-              <div className="border-t border-gray-200 p-2">
-                <input
-                  ref={consoleInputRef}
-                  type="text"
-                  placeholder={running ? 'Type input and press Enter…' : 'Run program to use input'}
-                  disabled={!running}
-                  className="w-full text-sm font-mono border border-gray-300 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
-                />
-                <p className="text-xs text-gray-400 mt-1">When the program requests INPUT, type here and press Enter</p>
-              </div>
+              <textarea
+                ref={terminalRef}
+                className="flex-1 resize-none font-mono text-sm bg-white text-gray-800 p-2.5 focus:outline-none"
+                style={{ lineHeight: '21px' }}
+                onKeyDown={e => {
+                  const ta = terminalRef.current!
+                  if (e.key === 'Enter') {
+                    if (!awaitingInputRef.current || !inputHandlerRef.current) { e.preventDefault(); return }
+                    e.preventDefault()
+                    const typed = ta.value.slice(protectedLenRef.current)
+                    ta.value = ta.value.slice(0, protectedLenRef.current)
+                    const w = window as any
+                    if (w._termInputEl) w._termInputEl.value = typed
+                    awaitingInputRef.current = false
+                    inputHandlerRef.current({ key: 'Enter' })
+                    return
+                  }
+                  const nav = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown']
+                  if (!awaitingInputRef.current && !nav.includes(e.key)) {
+                    e.preventDefault(); return
+                  }
+                  if ((e.key === 'Backspace' || e.key === 'Delete') && ta.selectionStart <= protectedLenRef.current) {
+                    e.preventDefault()
+                  }
+                }}
+                onClick={() => {
+                  const ta = terminalRef.current!
+                  if (ta.selectionStart < protectedLenRef.current) {
+                    ta.selectionStart = ta.selectionEnd = ta.value.length
+                  }
+                }}
+                onPaste={e => { if (!awaitingInputRef.current) e.preventDefault() }}
+              />
             </div>
           </div>
         </div>
