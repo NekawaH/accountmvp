@@ -6,7 +6,7 @@ import Script from 'next/script'
 
 interface PseudoFile { id: string; name: string; updatedAt: string }
 interface LoadedFile extends PseudoFile { content: string }
-interface WorkspaceInfo { id: string; name: string; user: { username: string; avatarUrl: string }; _count: { forks: number } }
+interface WorkspaceInfo { id: string; name: string; user: { username: string; avatarUrl: string }; _count?: { forks: number } }
 
 export default function PublicWorkspacePage() {
   const { username, id: workspaceId } = useParams<{ username: string; id: string }>()
@@ -166,7 +166,7 @@ export default function PublicWorkspacePage() {
             <p className="text-xs text-gray-500 mt-1.5 truncate font-semibold">{ws?.name}</p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
               <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">Public · Read-only</span>
-              {ws && <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">⑂ {ws._count.forks}</span>}
+              {ws?._count && <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">⑂ {ws._count.forks}</span>}
             </div>
           </div>
 
