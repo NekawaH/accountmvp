@@ -7,7 +7,10 @@ export async function GET(req: NextRequest, { params }: { params: { username: st
 
   const workspaces = await prisma.workspace.findMany({
     where: { userId: user.id, isPublic: true },
-    select: { id: true, name: true, createdAt: true },
+    select: {
+      id: true, name: true, createdAt: true,
+      collaborators: { select: { user: { select: { username: true, avatarUrl: true } } } },
+    },
     orderBy: { createdAt: 'desc' },
   })
   return NextResponse.json(workspaces)

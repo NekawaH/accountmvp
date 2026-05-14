@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Workspace { id: string; name: string; createdAt: string; isPublic: boolean; _count?: { forks: number }; collaborators?: { user: Contributor }[] }
+interface CollabWorkspace { id: string; name: string; createdAt: string; isPublic: boolean; user: Contributor; collaborators?: { user: Contributor }[] }
 interface Profile { username: string; avatarUrl: string }
 interface UserResult { username: string; avatarUrl: string }
 interface Contributor { username: string; avatarUrl: string }
@@ -19,6 +20,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [collabWorkspaces, setCollabWorkspaces] = useState<CollabWorkspace[]>([])
   const [messageCount, setMessageCount] = useState(0)
   // Search
   const [searchQ, setSearchQ] = useState('')
@@ -31,6 +33,7 @@ export default function DashboardPage() {
     fetch('/api/workspaces').then(r => r.ok ? r.json() : []).then(setWorkspaces).finally(() => setLoading(false))
     fetch('/api/profile').then(r => r.ok ? r.json() : null).then(setProfile)
     fetch('/api/messages/count').then(r => r.ok ? r.json() : { count: 0 }).then(d => setMessageCount(d.count))
+    fetch('/api/workspaces/collaborations').then(r => r.ok ? r.json() : []).then(setCollabWorkspaces)
   }, [])
 
   // Debounced search (users + workspaces)
@@ -278,6 +281,43 @@ export default function DashboardPage() {
                 )}
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Collaborating workspaces */}
+        {collabWorkspaces.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Collaborating</h2>
+            <div className="space-y-2">
+              {collabWorkspaces.map(ws => (
+                <div
+                  key={ws.id}
+                  onClick={() => router.push(`/users/${ws.user.username}/workspace/${ws.id}`)}
+                  className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm hover:border-blue-300 hover:shadow transition-all cursor-pointer group flex items-center justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors truncate">{ws.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">by {ws.user.username}</p>
+                  </div>
+                  {/* Contributor avatars */}
+                  <div className="flex items-center flex-shrink-0 ml-3">
+                    <div className="relative">
+                      {ws.user.avatarUrl
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={ws.user.avatarUrl} alt={ws.user.username} title={`${ws.user.username} (owner)`} className="w-7 h-7 rounded-full object-cover ring-2 ring-yellow-400" />
+                        : <div className="w-7 h-7 rounded-full bg-gray-200 ring-2 ring-yellow-400" />}
+                      <span className="absolute -top-1.5 -right-1 text-[9px] leading-none select-none">👑</span>
+                    </div>
+                    {ws.collaborators?.slice(0, 3).map((c, i) => (
+                      c.user.avatarUrl
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img key={i} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-6 h-6 rounded-full object-cover ring-2 ring-white -ml-1.5" />
+                        : <div key={i} title={c.user.username} className="w-6 h-6 rounded-full bg-gray-300 ring-2 ring-white -ml-1.5" />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
