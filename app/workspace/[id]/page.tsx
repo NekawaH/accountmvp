@@ -138,6 +138,8 @@ export default function WorkspacePage() {
   const [inviteUsername, setInviteUsername] = useState('')
   const [inviteStatus, setInviteStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const [inviting, setInviting] = useState(false)
+  const [searchResults, setSearchResults] = useState<{ username: string; avatarUrl: string | null }[]>([])
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputBoxRef = useRef<HTMLTextAreaElement>(null)
   const terminalRef = useRef<HTMLTextAreaElement>(null)
   const protectedLenRef = useRef(0)
@@ -407,7 +409,7 @@ export default function WorkspacePage() {
     })
     const json = await res.json()
     setInviteStatus({ ok: res.ok, msg: res.ok ? `Invitation sent to ${inviteUsername.trim()}` : (json.error ?? 'Error') })
-    if (res.ok) setInviteUsername('')
+    if (res.ok) { setInviteUsername(''); setSearchResults([]) }
     setInviting(false)
   }
 
@@ -637,6 +639,18 @@ export default function WorkspacePage() {
     return () => window.removeEventListener('keydown', handler)
   }, [activeFile, code])
 
+  useEffect(() => {
+    if (!showInvite) return
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    const q = inviteUsername.trim()
+    if (q.length < 2) { setSearchResults([]); return }
+    searchTimerRef.current = setTimeout(async () => {
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}`)
+      if (res.ok) setSearchResults(await res.json())
+    }, 250)
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+  }, [inviteUsername, showInvite])
+
   return (
     <>
       <Script
@@ -779,18 +793,38 @@ export default function WorkspacePage() {
             {/* Invite collaborator */}
             {showInvite ? (
               <div className="space-y-1.5">
-                <input
-                  value={inviteUsername}
-                  onChange={e => setInviteUsername(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && sendInvite()}
-                  placeholder="Username to invite…"
-                  className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  autoFocus
-                />
+                <div className="relative">
+                  <input
+                    value={inviteUsername}
+                    onChange={e => { setInviteUsername(e.target.value); setInviteStatus(null) }}
+                    onKeyDown={e => e.key === 'Enter' && sendInvite()}
+                    placeholder="Search users…"
+                    className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    autoFocus
+                  />
+                  {searchResults.length > 0 && (
+                    <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border border-gray-200 rounded shadow-lg z-10 max-h-36 overflow-y-auto">
+                      {searchResults.map(user => (
+                        <button
+                          key={user.username}
+                          onMouseDown={e => e.preventDefault()}
+                          onClick={() => { setInviteUsername(user.username); setSearchResults([]) }}
+                          className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-gray-50 text-left"
+                        >
+                          {user.avatarUrl
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={user.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover flex-shrink-0" />
+                            : <div className="w-5 h-5 rounded-full bg-gray-200 flex-shrink-0" />}
+                          <span className="text-xs text-gray-800 truncate">{user.username}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {inviteStatus && <p className={`text-xs ${inviteStatus.ok ? 'text-green-600' : 'text-red-500'}`}>{inviteStatus.msg}</p>}
                 <div className="flex gap-1">
                   <button onClick={sendInvite} disabled={inviting} className="flex-1 text-xs py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium">{inviting ? '…' : 'Send invite'}</button>
-                  <button onClick={() => { setShowInvite(false); setInviteStatus(null) }} className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 rounded">✕</button>
+                  <button onClick={() => { setShowInvite(false); setInviteStatus(null); setSearchResults([]) }} className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 rounded">✕</button>
                 </div>
               </div>
             ) : (
