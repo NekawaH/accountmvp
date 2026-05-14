@@ -125,8 +125,8 @@ export default function DashboardPage() {
                 : <div className="w-6 h-6 rounded-full bg-gray-200" />}
               <span className="text-sm text-gray-700 font-medium">{profile?.username ?? '…'}</span>
             </button>
-            <form action="/api/auth/logout" method="POST">
-              <button type="submit" className="h-9 px-4 bg-gray-100 hover:bg-gray-200 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">Sign out</button>
+            <form action="/api/auth/logout" method="POST" className="flex items-center">
+              <button type="submit" className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-sm font-medium text-gray-700 rounded-lg transition-colors whitespace-nowrap">Sign out</button>
             </form>
           </div>
         </div>
