@@ -103,8 +103,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push('/messages')}
-              className="relative px-3 py-2 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors text-sm text-gray-700"
-              title="Messages"
+              className="relative flex items-center gap-1.5 h-9 px-3 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors text-sm text-gray-700 whitespace-nowrap"
             >
               ✉ Messages
               {messageCount > 0 && (
@@ -113,11 +112,11 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => setShowCreate(v => !v)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
+              className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
             >+ New workspace</button>
             <button
               onClick={() => router.push('/profile')}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors"
+              className="flex items-center gap-2 h-9 px-3 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors whitespace-nowrap"
               title="Profile"
             >
               {profile?.avatarUrl
@@ -127,7 +126,7 @@ export default function DashboardPage() {
               <span className="text-sm text-gray-700 font-medium">{profile?.username ?? '…'}</span>
             </button>
             <form action="/api/auth/logout" method="POST">
-              <button type="submit" className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-sm font-medium rounded-lg transition-colors">Sign out</button>
+              <button type="submit" className="h-9 px-4 bg-gray-100 hover:bg-gray-200 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">Sign out</button>
             </form>
           </div>
         </div>
