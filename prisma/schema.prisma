@@ -8,31 +8,61 @@ datasource db {
 }
 
 model User {
-  id             String      @id @default(cuid())
-  email          String      @unique
-  passwordHash   String
-  emailVerified  Boolean     @default(false)
-  verifyToken    String?     @unique
-  verifyTokenExp DateTime?
-  createdAt      DateTime    @default(now())
-  username       String      @unique
-  avatarUrl      String      @default("")
-  workspaces     Workspace[]
+  id                  String                  @id @default(cuid())
+  email               String                  @unique
+  passwordHash        String
+  emailVerified       Boolean                 @default(false)
+  verifyToken         String?                 @unique
+  verifyTokenExp      DateTime?
+  createdAt           DateTime                @default(now())
+  username            String                  @unique
+  avatarUrl           String                  @default("")
+  workspaces          Workspace[]
+  invitationsSent     WorkspaceInvitation[]   @relation("InvitationsSent")
+  invitationsReceived WorkspaceInvitation[]   @relation("InvitationsReceived")
+  collaborations      WorkspaceCollaborator[]
 }
 
 model Workspace {
-  id           String       @id @default(cuid())
-  userId       String
-  name         String
-  isPublic     Boolean      @default(false)
-  createdAt    DateTime     @default(now())
-  forkedFromId String?
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  files        PseudoFile[]
-  forkedFrom   Workspace?   @relation("WorkspaceForks", fields: [forkedFromId], references: [id], onDelete: SetNull)
-  forks        Workspace[]  @relation("WorkspaceForks")
+  id            String                  @id @default(cuid())
+  userId        String
+  name          String
+  isPublic      Boolean                 @default(false)
+  createdAt     DateTime                @default(now())
+  forkedFromId  String?
+  user          User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files         PseudoFile[]
+  forkedFrom    Workspace?              @relation("WorkspaceForks", fields: [forkedFromId], references: [id], onDelete: SetNull)
+  forks         Workspace[]             @relation("WorkspaceForks")
+  invitations   WorkspaceInvitation[]
+  collaborators WorkspaceCollaborator[]
 
   @@unique([userId, name])
+}
+
+model WorkspaceInvitation {
+  id          String    @id @default(cuid())
+  workspaceId String
+  fromUserId  String
+  toUserId    String
+  status      String    @default("PENDING")
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  from        User      @relation("InvitationsSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  to          User      @relation("InvitationsReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, toUserId])
+}
+
+model WorkspaceCollaborator {
+  id          String    @id @default(cuid())
+  workspaceId String
+  userId      String
+  joinedAt    DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
 }
 
 model PseudoFile {

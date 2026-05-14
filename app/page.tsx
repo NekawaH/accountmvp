@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface Workspace { id: string; name: string; createdAt: string; isPublic: boolean; _count?: { forks: number } }
+interface Workspace { id: string; name: string; createdAt: string; isPublic: boolean; _count?: { forks: number }; collaborators?: { user: Contributor }[] }
 interface Profile { username: string; avatarUrl: string }
 interface UserResult { username: string; avatarUrl: string }
-interface WorkspaceResult { id: string; name: string; user: { username: string; avatarUrl: string } }
+interface Contributor { username: string; avatarUrl: string }
+interface WorkspaceResult { id: string; name: string; user: Contributor; collaborators?: { user: Contributor }[] }
 
 export default function DashboardPage() {
   const router = useRouter()
@@ -18,6 +19,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [messageCount, setMessageCount] = useState(0)
   // Search
   const [searchQ, setSearchQ] = useState('')
   const [userResults, setUserResults] = useState<UserResult[]>([])
@@ -28,6 +30,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.ok ? r.json() : []).then(setWorkspaces).finally(() => setLoading(false))
     fetch('/api/profile').then(r => r.ok ? r.json() : null).then(setProfile)
+    fetch('/api/messages/count').then(r => r.ok ? r.json() : { count: 0 }).then(d => setMessageCount(d.count))
   }, [])
 
   // Debounced search (users + workspaces)
@@ -99,6 +102,16 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => router.push('/messages')}
+              className="relative px-3 py-2 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors text-sm text-gray-700"
+              title="Messages"
+            >
+              ✉ Messages
+              {messageCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">{messageCount}</span>
+              )}
+            </button>
+            <button
               onClick={() => setShowCreate(v => !v)}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors"
             >+ New workspace</button>
@@ -159,10 +172,22 @@ export default function DashboardPage() {
                       onMouseDown={() => router.push(`/users/${ws.user.username}/workspace/${ws.id}`)}
                       className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-gray-50 text-left"
                     >
-                      {ws.user.avatarUrl
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={ws.user.avatarUrl} alt="" className="w-7 h-7 rounded-full object-cover" />
-                        : <div className="w-7 h-7 rounded-full bg-gray-200" />}
+                      {/* Stacked avatars: owner first (with crown), then collaborators */}
+                      <div className="flex items-center flex-shrink-0">
+                        <div className="relative">
+                          {ws.user.avatarUrl
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img src={ws.user.avatarUrl} alt={ws.user.username} title={`${ws.user.username} (owner)`} className="w-7 h-7 rounded-full object-cover ring-2 ring-yellow-400" />
+                            : <div title={`${ws.user.username} (owner)`} className="w-7 h-7 rounded-full bg-gray-200 ring-2 ring-yellow-400" />}
+                          <span className="absolute -top-1 -right-1 text-[8px] leading-none">👑</span>
+                        </div>
+                        {ws.collaborators?.slice(0, 3).map((c, i) => (
+                          c.user.avatarUrl
+                            // eslint-disable-next-line @next/next/no-img-element
+                            ? <img key={i} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-6 h-6 rounded-full object-cover ring-2 ring-white -ml-1.5" />
+                            : <div key={i} title={c.user.username} className="w-6 h-6 rounded-full bg-gray-300 ring-2 ring-white -ml-1.5" />
+                        ))}
+                      </div>
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-800 truncate">{ws.name}</p>
                         <p className="text-xs text-gray-400">{ws.user.username}</p>
@@ -226,7 +251,19 @@ export default function DashboardPage() {
                         <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors truncate">{ws.name}</p>
                         {ws.isPublic && ws._count && ws._count.forks > 0 && <span className="text-xs text-gray-400 flex-shrink-0">⑂ {ws._count.forks}</span>}
                       </div>
-                      <p className="text-xs text-gray-400 mt-0.5">Created {new Date(ws.createdAt).toLocaleDateString()}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs text-gray-400">Created {new Date(ws.createdAt).toLocaleDateString()}</p>
+                        {ws.collaborators && ws.collaborators.length > 0 && (
+                          <div className="flex items-center">
+                            {ws.collaborators.slice(0, 4).map((c, i) => (
+                              c.user.avatarUrl
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img key={i} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-4 h-4 rounded-full object-cover ring-1 ring-white -ml-0.5 first:ml-0" />
+                                : <div key={i} title={c.user.username} className="w-4 h-4 rounded-full bg-gray-300 ring-1 ring-white -ml-0.5 first:ml-0" />
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </button>
                     <div className="flex items-center gap-2 ml-3 flex-shrink-0">
                       {/* Public/private toggle */}

@@ -7,7 +7,11 @@ export async function GET(req: NextRequest) {
 
   const workspaces = await prisma.workspace.findMany({
     where: { isPublic: true, name: { contains: q, mode: 'insensitive' } },
-    select: { id: true, name: true, user: { select: { username: true, avatarUrl: true } } },
+    select: {
+      id: true, name: true,
+      user: { select: { username: true, avatarUrl: true } },
+      collaborators: { select: { user: { select: { username: true, avatarUrl: true } } } },
+    },
     take: 10,
     orderBy: { createdAt: 'desc' },
   })

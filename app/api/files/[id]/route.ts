@@ -8,6 +8,19 @@ async function getFile(userId: string, fileId: string) {
   })
 }
 
+async function canEditFile(userId: string, fileId: string) {
+  const file = await prisma.pseudoFile.findUnique({
+    where: { id: fileId },
+    select: { workspaceId: true, workspace: { select: { userId: true } } },
+  })
+  if (!file) return null
+  if (file.workspace.userId === userId) return file
+  const collab = await prisma.workspaceCollaborator.findUnique({
+    where: { workspaceId_userId: { workspaceId: file.workspaceId, userId } },
+  })
+  return collab ? file : null
+}
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   // Allow unauthenticated read if file belongs to a public workspace
   const file = await prisma.pseudoFile.findUnique({
@@ -30,7 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const existing = await getFile(session.userId, params.id)
+  const existing = await canEditFile(session.userId, params.id)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { content } = await req.json()

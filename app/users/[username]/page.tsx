@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 
 interface UserProfile { username: string; avatarUrl: string }
-interface Workspace { id: string; name: string; createdAt: string; _count?: { forks: number } }
+interface Contributor { username: string; avatarUrl: string }
+interface Workspace { id: string; name: string; createdAt: string; _count?: { forks: number }; collaborators?: { user: Contributor }[] }
 
 export default function UserProfilePage() {
   const { username } = useParams<{ username: string }>()
@@ -68,7 +69,19 @@ export default function UserProfilePage() {
                   <p className="font-medium text-gray-900 group-hover:text-blue-700 transition-colors">{ws.name}</p>
                   {ws._count && ws._count.forks > 0 && <span className="text-xs text-gray-400">⑂ {ws._count.forks}</span>}
                 </div>
-                <p className="text-xs text-gray-400 mt-0.5">Created {new Date(ws.createdAt).toLocaleDateString()}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-xs text-gray-400">Created {new Date(ws.createdAt).toLocaleDateString()}</p>
+                  {ws.collaborators && ws.collaborators.length > 0 && (
+                    <div className="flex items-center">
+                      {ws.collaborators.slice(0, 4).map((c, i) => (
+                        c.user.avatarUrl
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img key={i} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-4 h-4 rounded-full object-cover ring-1 ring-white -ml-0.5 first:ml-0" />
+                          : <div key={i} title={c.user.username} className="w-4 h-4 rounded-full bg-gray-300 ring-1 ring-white -ml-0.5 first:ml-0" />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
           </div>

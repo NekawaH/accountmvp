@@ -6,7 +6,15 @@ import Script from 'next/script'
 
 interface PseudoFile { id: string; name: string; updatedAt: string }
 interface LoadedFile extends PseudoFile { content: string }
-interface WorkspaceInfo { id: string; name: string; user: { username: string; avatarUrl: string }; _count?: { forks: number } }
+interface Collaborator { userId: string; user: { username: string; avatarUrl: string } }
+interface WorkspaceInfo {
+  id: string; name: string
+  userId: string
+  user: { username: string; avatarUrl: string }
+  collaborators?: Collaborator[]
+  _count?: { forks: number }
+}
+interface Profile { username: string; avatarUrl: string }
 
 export default function PublicWorkspacePage() {
   const { username, id: workspaceId } = useParams<{ username: string; id: string }>()
@@ -18,9 +26,12 @@ export default function PublicWorkspacePage() {
   const [code, setCode] = useState('')
   const [running, setRunning] = useState(false)
   const [forking, setForking] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [showPrompts, setShowPrompts] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [consoleWidth, setConsoleWidth] = useState(320)
+  const [isCollaborator, setIsCollaborator] = useState(false)
+  const [profile, setProfile] = useState<Profile | null>(null)
 
   const terminalRef = useRef<HTMLTextAreaElement>(null)
   const lineNumRef = useRef<HTMLDivElement>(null)
@@ -39,11 +50,27 @@ export default function PublicWorkspacePage() {
   }, [])
 
   const load = useCallback(async () => {
-    const wsRes = await fetch(`/api/workspaces/${workspaceId}`)
+    const [wsRes, profileRes] = await Promise.all([
+      fetch(`/api/workspaces/${workspaceId}`),
+      fetch('/api/profile'),
+    ])
     if (!wsRes.ok) { setNotFound(true); return }
     const wsData: WorkspaceInfo = await wsRes.json()
     if (wsData.user.username !== username) { setNotFound(true); return }
     setWs(wsData)
+
+    const me: Profile | null = profileRes.ok ? await profileRes.json() : null
+    setProfile(me)
+
+    if (me) {
+      if (wsData.user.username === me.username) {
+        // Owner — redirect to their own editor
+        router.replace(`/workspace/${workspaceId}`)
+        return
+      }
+      const collab = wsData.collaborators?.some(c => c.user.username === me.username) ?? false
+      setIsCollaborator(collab)
+    }
 
     const filesRes = await fetch(`/api/files?workspaceId=${workspaceId}&withContent=true`)
     if (!filesRes.ok) { setNotFound(true); return }
@@ -57,42 +84,30 @@ export default function PublicWorkspacePage() {
 
     const main = entries.find(f => f.name === 'main.psc') ?? entries[0]
     if (main) { setActiveFile(main); setCode(main.content) }
-  }, [workspaceId, username])
+  }, [workspaceId, username, router])
 
   useEffect(() => { load() }, [load])
 
   function initInterpreter() {
     const w = window as any
     if (interpreterReady.current || !w.pseudoIDE || !terminalRef.current) return
-
     const ta = terminalRef.current
-
     const outputEl = {
       get textContent() { return ta.value },
-      set textContent(v: string) {
-        ta.value = v
-        protectedLenRef.current = v.length
-        ta.scrollTop = ta.scrollHeight
-      },
+      set textContent(v: string) { ta.value = v; protectedLenRef.current = v.length; ta.scrollTop = ta.scrollHeight },
       get scrollTop() { return ta.scrollTop },
       set scrollTop(v: number) { ta.scrollTop = v },
       get scrollHeight() { return ta.scrollHeight },
     }
-
     const inputEl: any = {
       value: '',
       focus() {
         if (terminatedRef.current) throw new Error('Terminated')
-        awaitingInputRef.current = true
-        ta.focus()
-        ta.selectionStart = ta.selectionEnd = ta.value.length
+        awaitingInputRef.current = true; ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length
       },
-      addEventListener(_event: string, handler: (e: any) => void) {
-        inputHandlerRef.current = handler
-      },
+      addEventListener(_event: string, handler: (e: any) => void) { inputHandlerRef.current = handler },
     }
     w._termInputEl = inputEl
-
     w.pseudoIDE.init(outputEl, inputEl)
     interpreterReady.current = true
   }
@@ -106,10 +121,7 @@ export default function PublicWorkspacePage() {
   async function runCode() {
     initInterpreter()
     const w = window as any
-    if (!w.pseudoIDE) {
-      if (terminalRef.current) terminalRef.current.value = 'Error: interpreter not loaded yet, try again.'
-      return
-    }
+    if (!w.pseudoIDE) { if (terminalRef.current) terminalRef.current.value = 'Error: interpreter not loaded yet, try again.'; return }
     terminatedRef.current = false
     w.vfs = { ...vfsMirror.current }
     setRunning(true)
@@ -118,33 +130,39 @@ export default function PublicWorkspacePage() {
     } catch (err: any) {
       if (terminalRef.current) terminalRef.current.value += '\nError: ' + err.message
     } finally {
-      terminatedRef.current = true
-      awaitingInputRef.current = false
-      setRunning(false)
+      terminatedRef.current = true; awaitingInputRef.current = false; setRunning(false)
     }
+  }
+
+  async function saveFile() {
+    if (!activeFile) return
+    setSaving(true)
+    await fetch(`/api/files/${activeFile.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: code }),
+    })
+    vfsMirror.current[activeFile.name] = code
+    setSaving(false)
   }
 
   async function forkWorkspace() {
     setForking(true)
     const res = await fetch(`/api/workspaces/${workspaceId}/fork`, { method: 'POST' })
-    if (res.ok) {
-      const { id } = await res.json()
-      router.push(`/workspace/${id}`)
-    } else {
-      setForking(false)
-    }
+    if (res.ok) { const { id } = await res.json(); router.push(`/workspace/${id}`) }
+    else setForking(false)
   }
 
-  if (notFound) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-500 mb-3">Workspace not found or is private.</p>
-          <button onClick={() => router.push('/')} className="text-blue-600 hover:underline text-sm">← Back</button>
-        </div>
+  if (notFound) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-gray-500 mb-3">Workspace not found or is private.</p>
+        <button onClick={() => router.push('/')} className="text-blue-600 hover:underline text-sm">← Back</button>
       </div>
-    )
-  }
+    </div>
+  )
+
+  const canEdit = isCollaborator
 
   return (
     <>
@@ -165,9 +183,24 @@ export default function PublicWorkspacePage() {
             )}
             <p className="text-xs text-gray-500 mt-1.5 truncate font-semibold">{ws?.name}</p>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">Public · Read-only</span>
-              {ws?._count && <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">⑂ {ws._count.forks}</span>}
+              {isCollaborator
+                ? <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">Collaborating</span>
+                : <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded font-medium">Public · Read-only</span>
+              }
+              {ws?._count && ws._count.forks > 0 && <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">⑂ {ws._count.forks}</span>}
             </div>
+
+            {/* Collaborator avatars */}
+            {ws?.collaborators && ws.collaborators.length > 0 && (
+              <div className="flex items-center gap-1 mt-2 flex-wrap">
+                {ws.collaborators.map(c => (
+                  c.user.avatarUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img key={c.userId} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-5 h-5 rounded-full object-cover border border-white" />
+                    : <div key={c.userId} title={c.user.username} className="w-5 h-5 rounded-full bg-gray-300 border border-white" />
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -198,16 +231,23 @@ export default function PublicWorkspacePage() {
               <input id="showPrompts" type="checkbox" checked={showPrompts} onChange={e => setShowPrompts(e.target.checked)} className="accent-blue-600" />
               Show prompts
             </label>
-            <button onClick={forkWorkspace} disabled={forking}
-              className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded font-semibold border border-gray-300"
-            >{forking ? 'Forking…' : '⑂ Fork'}</button>
+            {canEdit && (
+              <button onClick={saveFile} disabled={saving}
+                className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-semibold"
+              >{saving ? 'Saving…' : 'Save'}</button>
+            )}
+            {!canEdit && (
+              <button onClick={forkWorkspace} disabled={forking}
+                className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded font-semibold border border-gray-300"
+              >{forking ? 'Forking…' : '⑂ Fork'}</button>
+            )}
             <button onClick={runCode} disabled={running}
               className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-semibold"
             >{running ? '⏳ Running…' : '▶ Run'}</button>
           </div>
 
           <div className="flex-1 flex overflow-hidden min-h-0">
-            {/* Code editor — read-only */}
+            {/* Code editor */}
             <div className="flex-1 flex flex-col overflow-hidden border-r border-gray-200 min-h-0">
               <div className="flex flex-1 overflow-auto min-h-0 bg-gray-50">
                 <div
@@ -219,9 +259,10 @@ export default function PublicWorkspacePage() {
                 </div>
                 <textarea
                   value={code}
-                  readOnly
+                  onChange={canEdit ? e => { setCode(e.target.value); if (activeFile) vfsMirror.current[activeFile.name] = e.target.value } : undefined}
+                  readOnly={!canEdit}
                   spellCheck={false}
-                  className="flex-1 resize-none font-mono text-sm bg-gray-50 text-gray-800 p-2.5 focus:outline-none cursor-default"
+                  className={`flex-1 resize-none font-mono text-sm p-2.5 focus:outline-none ${canEdit ? 'bg-white text-gray-800' : 'bg-gray-50 text-gray-800 cursor-default'}`}
                   style={{ lineHeight: '21px', overflow: 'hidden', minHeight: '100%', height: `${lineCount * 21 + 20}px` }}
                 />
               </div>
@@ -265,18 +306,12 @@ export default function PublicWorkspacePage() {
                     return
                   }
                   const nav = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown']
-                  if (!awaitingInputRef.current && !nav.includes(e.key)) {
-                    e.preventDefault(); return
-                  }
-                  if ((e.key === 'Backspace' || e.key === 'Delete') && ta.selectionStart <= protectedLenRef.current) {
-                    e.preventDefault()
-                  }
+                  if (!awaitingInputRef.current && !nav.includes(e.key)) { e.preventDefault(); return }
+                  if ((e.key === 'Backspace' || e.key === 'Delete') && ta.selectionStart <= protectedLenRef.current) { e.preventDefault() }
                 }}
                 onClick={() => {
                   const ta = terminalRef.current!
-                  if (ta.selectionStart < protectedLenRef.current) {
-                    ta.selectionStart = ta.selectionEnd = ta.value.length
-                  }
+                  if (ta.selectionStart < protectedLenRef.current) { ta.selectionStart = ta.selectionEnd = ta.value.length }
                 }}
                 onPaste={e => { if (!awaitingInputRef.current) e.preventDefault() }}
               />

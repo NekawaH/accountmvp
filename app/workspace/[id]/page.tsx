@@ -133,6 +133,11 @@ export default function WorkspacePage() {
   const [showLeaveWarning, setShowLeaveWarning] = useState(false)
   const pendingLeave = useRef<(() => void) | null>(null)
   const [consoleWidth, setConsoleWidth] = useState(320)
+  // Invite collaborator
+  const [showInvite, setShowInvite] = useState(false)
+  const [inviteUsername, setInviteUsername] = useState('')
+  const [inviteStatus, setInviteStatus] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [inviting, setInviting] = useState(false)
   const inputBoxRef = useRef<HTMLTextAreaElement>(null)
   const terminalRef = useRef<HTMLTextAreaElement>(null)
   const protectedLenRef = useRef(0)
@@ -389,6 +394,21 @@ export default function WorkspacePage() {
     if (activeFile?.id === f.id) {
       setActiveFile(created)
     }
+  }
+
+  async function sendInvite() {
+    if (!inviteUsername.trim()) return
+    setInviting(true)
+    setInviteStatus(null)
+    const res = await fetch(`/api/workspaces/${workspaceId}/invite`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: inviteUsername.trim() }),
+    })
+    const json = await res.json()
+    setInviteStatus({ ok: res.ok, msg: res.ok ? `Invitation sent to ${inviteUsername.trim()}` : (json.error ?? 'Error') })
+    if (res.ok) setInviteUsername('')
+    setInviting(false)
   }
 
   function terminateProgram() {
@@ -756,6 +776,26 @@ export default function WorkspacePage() {
           </div>
 
           <div className="p-3 border-t border-gray-200 space-y-1.5">
+            {/* Invite collaborator */}
+            {showInvite ? (
+              <div className="space-y-1.5">
+                <input
+                  value={inviteUsername}
+                  onChange={e => setInviteUsername(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendInvite()}
+                  placeholder="Username to invite…"
+                  className="w-full text-xs border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  autoFocus
+                />
+                {inviteStatus && <p className={`text-xs ${inviteStatus.ok ? 'text-green-600' : 'text-red-500'}`}>{inviteStatus.msg}</p>}
+                <div className="flex gap-1">
+                  <button onClick={sendInvite} disabled={inviting} className="flex-1 text-xs py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-medium">{inviting ? '…' : 'Send invite'}</button>
+                  <button onClick={() => { setShowInvite(false); setInviteStatus(null) }} className="text-xs px-2 py-1 text-gray-500 hover:text-gray-700 rounded">✕</button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setShowInvite(true)} className="block w-full text-xs text-center text-blue-600 hover:text-blue-700 font-medium">+ Invite collaborator</button>
+            )}
             <button
               onClick={() => safeNavigate(() => router.push('/'))}
               className="block w-full text-xs text-center text-gray-500 hover:text-gray-700"
