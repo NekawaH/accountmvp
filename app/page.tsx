@@ -96,14 +96,11 @@ export default function DashboardPage() {
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Workspaces</h1>
-            <p className="text-sm text-gray-500 mt-1">Open a workspace to edit pseudocode</p>
-          </div>
-          <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">Workspaces</h1>
+          <div className="flex items-center gap-2">
             <button
               onClick={() => router.push('/messages')}
-              className="relative flex items-center gap-1.5 h-9 px-3 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors text-sm text-gray-700 whitespace-nowrap"
+              className="relative flex items-center gap-1.5 h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-gray-700 whitespace-nowrap"
             >
               ✉ Messages
               {messageCount > 0 && (
@@ -112,12 +109,11 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => setShowCreate(v => !v)}
-              className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+              className="h-9 px-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg whitespace-nowrap"
             >+ New workspace</button>
             <button
               onClick={() => router.push('/profile')}
-              className="flex items-center gap-2 h-9 px-3 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors whitespace-nowrap"
-              title="Profile"
+              className="flex items-center gap-2 h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg whitespace-nowrap"
             >
               {profile?.avatarUrl
                 // eslint-disable-next-line @next/next/no-img-element
@@ -125,8 +121,8 @@ export default function DashboardPage() {
                 : <div className="w-6 h-6 rounded-full bg-gray-200" />}
               <span className="text-sm text-gray-700 font-medium">{profile?.username ?? '…'}</span>
             </button>
-            <form action="/api/auth/logout" method="POST" className="flex items-center">
-              <button type="submit" className="h-9 px-4 bg-white border border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-sm font-medium text-gray-700 rounded-lg transition-colors whitespace-nowrap">Sign out</button>
+            <form action="/api/auth/logout" method="POST">
+              <button type="submit" className="h-9 px-4 bg-white border border-gray-300 hover:border-gray-400 text-sm font-medium text-gray-700 rounded-lg whitespace-nowrap">Sign out</button>
             </form>
           </div>
         </div>
