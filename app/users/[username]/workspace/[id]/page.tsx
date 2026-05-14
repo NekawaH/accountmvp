@@ -130,7 +130,7 @@ export default function PublicWorkspacePage() {
     } catch (err: any) {
       if (terminalRef.current) terminalRef.current.value += '\nError: ' + err.message
     } finally {
-      terminatedRef.current = true; awaitingInputRef.current = false; setRunning(false)
+      awaitingInputRef.current = false; setRunning(false)
     }
   }
 
@@ -144,6 +144,17 @@ export default function PublicWorkspacePage() {
     })
     vfsMirror.current[activeFile.name] = code
     setSaving(false)
+  }
+
+  function terminateProgram() {
+    terminatedRef.current = true
+    awaitingInputRef.current = false
+    if (inputHandlerRef.current) {
+      const w = window as any
+      if (w._termInputEl) w._termInputEl.value = ''
+      inputHandlerRef.current({ key: 'Enter' })
+    }
+    if (terminalRef.current) terminalRef.current.value += '\n[Terminated]'
   }
 
   async function forkWorkspace() {
@@ -233,7 +244,7 @@ export default function PublicWorkspacePage() {
             </label>
             {canEdit && (
               <button onClick={saveFile} disabled={saving}
-                className="text-xs px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded font-semibold"
+                className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
               >{saving ? 'Saving…' : 'Save'}</button>
             )}
             {!canEdit && (
@@ -241,9 +252,14 @@ export default function PublicWorkspacePage() {
                 className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded font-semibold border border-gray-300"
               >{forking ? 'Forking…' : '⑂ Fork'}</button>
             )}
-            <button onClick={runCode} disabled={running}
-              className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded font-semibold"
-            >{running ? '⏳ Running…' : '▶ Run'}</button>
+            {running
+              ? <button onClick={terminateProgram}
+                  className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-semibold"
+                >■ Stop</button>
+              : <button onClick={runCode}
+                  className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-semibold"
+                >▶ Run</button>
+            }
           </div>
 
           <div className="flex-1 flex overflow-hidden min-h-0">
