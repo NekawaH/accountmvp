@@ -37,6 +37,7 @@ export default function WorkspacePage() {
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null)
+  const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<string | null>(null)
   const drafts = useRef<Record<string, string>>({})
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
   const [showLeaveWarning, setShowLeaveWarning] = useState(false)
@@ -448,16 +449,32 @@ export default function WorkspacePage() {
           <div className="space-y-1 pt-1">
             {collaborators.map(c => (
               <div key={c.userId} className="flex items-center gap-1.5 group">
-                {c.user.avatarUrl
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={c.user.avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
-                  : <div className="w-4 h-4 rounded-full bg-gray-200 flex-shrink-0" />}
-                <span className="text-xs text-gray-600 truncate flex-1">{c.user.username}</span>
-                <button
-                  onClick={() => removeCollaborator(c.userId)}
-                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs flex-shrink-0"
-                  title="Remove collaborator"
-                >✕</button>
+                {confirmRemoveUserId === c.userId ? (
+                  <>
+                    <span className="text-xs text-gray-600 truncate flex-1">Remove <span className="font-medium">{c.user.username}</span>?</span>
+                    <button
+                      onClick={() => { removeCollaborator(c.userId); setConfirmRemoveUserId(null) }}
+                      className="text-xs px-1.5 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded font-medium flex-shrink-0"
+                    >Yes</button>
+                    <button
+                      onClick={() => setConfirmRemoveUserId(null)}
+                      className="text-xs px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded font-medium flex-shrink-0"
+                    >No</button>
+                  </>
+                ) : (
+                  <>
+                    {c.user.avatarUrl
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={c.user.avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+                      : <div className="w-4 h-4 rounded-full bg-gray-200 flex-shrink-0" />}
+                    <span className="text-xs text-gray-600 truncate flex-1">{c.user.username}</span>
+                    <button
+                      onClick={() => setConfirmRemoveUserId(c.userId)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs flex-shrink-0"
+                      title="Remove collaborator"
+                    >✕</button>
+                  </>
+                )}
               </div>
             ))}
           </div>
