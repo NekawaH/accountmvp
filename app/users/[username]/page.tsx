@@ -84,8 +84,8 @@ export default function UserProfilePage() {
                     {ws.collaborators?.slice(0, 3).map((c, i) => (
                       c.user.avatarUrl
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <img key={i} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-6 h-6 rounded-full object-cover ring-2 ring-white -ml-1.5" />
-                        : <div key={i} title={c.user.username} className="w-6 h-6 rounded-full bg-gray-300 ring-2 ring-white -ml-1.5" />
+                        ? <img key={i} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-6 h-6 rounded-full object-cover ring-2 ring-white -ml-1.5" style={{ zIndex: 3 - i }} />
+                        : <div key={i} title={c.user.username} className="w-6 h-6 rounded-full bg-gray-300 ring-2 ring-white -ml-1.5" style={{ zIndex: 3 - i }} />
                     ))}
                   </div>
                 </div>
