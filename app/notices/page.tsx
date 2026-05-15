@@ -19,7 +19,7 @@ interface SentInvitation {
   to: { username: string; avatarUrl: string }
 }
 
-export default function MessagesPage() {
+export default function NoticesPage() {
   const router = useRouter()
   const [received, setReceived] = useState<ReceivedInvitation[]>([])
   const [sent, setSent] = useState<SentInvitation[]>([])
@@ -59,7 +59,7 @@ export default function MessagesPage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center pt-16 px-4">
       <div className="w-full max-w-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Messages</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Notices</h1>
           <button onClick={() => router.push('/')} className="text-sm text-gray-500 hover:text-gray-700">← Dashboard</button>
         </div>
 
@@ -67,7 +67,7 @@ export default function MessagesPage() {
           <p className="text-sm text-gray-400 text-center mt-8">Loading…</p>
         ) : isEmpty ? (
           <div className="text-center mt-16">
-            <p className="text-gray-400 text-sm">No messages.</p>
+            <p className="text-gray-400 text-sm">No notices.</p>
           </div>
         ) : (
           <div className="space-y-6">

@@ -21,7 +21,7 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [collabWorkspaces, setCollabWorkspaces] = useState<CollabWorkspace[]>([])
-  const [messageCount, setMessageCount] = useState(0)
+  const [noticeCount, setNoticeCount] = useState(0)
   // Search
   const [searchQ, setSearchQ] = useState('')
   const [userResults, setUserResults] = useState<UserResult[]>([])
@@ -32,7 +32,7 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.ok ? r.json() : []).then(setWorkspaces).finally(() => setLoading(false))
     fetch('/api/profile').then(r => r.ok ? r.json() : null).then(setProfile)
-    fetch('/api/messages/count').then(r => r.ok ? r.json() : { count: 0 }).then(d => setMessageCount(d.count))
+    fetch('/api/messages/count').then(r => r.ok ? r.json() : { count: 0 }).then(d => setNoticeCount(d.count))
     fetch('/api/workspaces/collaborations').then(r => r.ok ? r.json() : []).then(setCollabWorkspaces)
   }, [])
 
@@ -102,12 +102,12 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-gray-900">Workspaces</h1>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => router.push('/messages')}
+              onClick={() => router.push('/notices')}
               className="relative flex items-center gap-1.5 h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-gray-700 whitespace-nowrap"
             >
-              ✉ Messages
-              {messageCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">{messageCount}</span>
+              🔔 Notices
+              {noticeCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">{noticeCount}</span>
               )}
             </button>
             <button
