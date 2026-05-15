@@ -158,10 +158,12 @@ export default function PublicWorkspacePage() {
         {ws?.collaborators && ws.collaborators.length > 0 && (
           <div className="flex items-center gap-1 mt-2 flex-wrap">
             {ws.collaborators.map(c => (
-              c.user.avatarUrl
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img key={c.userId} src={c.user.avatarUrl} alt={c.user.username} title={c.user.username} className="w-5 h-5 rounded-full object-cover border border-white" />
-                : <div key={c.userId} title={c.user.username} className="w-5 h-5 rounded-full bg-gray-300 border border-white" />
+              <button key={c.userId} onClick={() => router.push(`/users/${c.user.username}`)} title={c.user.username} className="hover:opacity-80">
+                {c.user.avatarUrl
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={c.user.avatarUrl} alt={c.user.username} className="w-5 h-5 rounded-full object-cover border border-white" />
+                  : <div className="w-5 h-5 rounded-full bg-gray-300 border border-white" />}
+              </button>
             ))}
           </div>
         )}
@@ -201,8 +203,8 @@ export default function PublicWorkspacePage() {
       </div>
 
       <div className="p-3 border-t border-gray-200">
-        <button onClick={() => router.push(`/users/${username}`)} className="block w-full text-xs text-center text-gray-500 hover:text-gray-700">
-          ← {username}'s profile
+        <button onClick={() => router.push('/')} className="block w-full text-xs text-center text-gray-500 hover:text-gray-700">
+          ← Dashboard
         </button>
       </div>
     </div>
