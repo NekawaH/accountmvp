@@ -35,11 +35,12 @@ export default function PublicWorkspacePage() {
   const vfsMirror = useRef<Record<string, string>>({})
 
   const load = useCallback(async () => {
-    const [wsRes, profileRes] = await Promise.all([
+    const [wsRes, profileRes, filesRes] = await Promise.all([
       fetch(`/api/workspaces/${workspaceId}`),
       fetch('/api/profile'),
+      fetch(`/api/files?workspaceId=${workspaceId}&withContent=true`),
     ])
-    if (!wsRes.ok) { setNotFound(true); return }
+    if (!wsRes.ok || !filesRes.ok) { setNotFound(true); return }
     const wsData: WorkspaceInfo = await wsRes.json()
     if (wsData.user.username !== username) { setNotFound(true); return }
     setWs(wsData)
@@ -54,8 +55,6 @@ export default function PublicWorkspacePage() {
       setIsCollaborator(wsData.collaborators?.some(c => c.user.username === me.username) ?? false)
     }
 
-    const filesRes = await fetch(`/api/files?workspaceId=${workspaceId}&withContent=true`)
-    if (!filesRes.ok) { setNotFound(true); return }
     const entries: LoadedFile[] = await filesRes.json()
     setFiles(entries)
 
