@@ -156,37 +156,40 @@ export default function PublicWorkspacePage() {
 
   const toolbarExtras = (
     <>
-      <div className="relative">
-        <button
-          onClick={() => setShowExamples(v => !v)}
-          className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50"
-        >Examples</button>
-        {showExamples && (
-          <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded shadow-lg w-44">
-            {EXAMPLES.map(ex => (
-              <button key={ex.label} onClick={() => { setCode(ex.code); setShowExamples(false) }}
-                className="block w-full text-left text-sm px-3 py-2 hover:bg-gray-50"
-              >{ex.label}</button>
-            ))}
+      {canEdit && (
+        <>
+          <div className="relative">
+            <button
+              onClick={() => setShowExamples(v => !v)}
+              className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50"
+            >Examples</button>
+            {showExamples && (
+              <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded shadow-lg w-44">
+                {EXAMPLES.map(ex => (
+                  <button key={ex.label} onClick={() => { setCode(ex.code); setShowExamples(false) }}
+                    className="block w-full text-left text-sm px-3 py-2 hover:bg-gray-50"
+                  >{ex.label}</button>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-      <button
-        onClick={() => {
-          const ta = document.getElementById('inputBox') as HTMLTextAreaElement | null
-          if (!ta) return
-          ta.focus()
-          ta.setSelectionRange(0, ta.value.length)
-          document.execCommand('insertText', false, formatCode(code))
-        }}
-        className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50"
-        title="Format code"
-      >Format</button>
-      {canEdit ? (
-        <button onClick={saveFile} disabled={saving}
-          className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
-        >{saving ? 'Saving…' : 'Save'}</button>
-      ) : (
+          <button
+            onClick={() => {
+              const ta = document.getElementById('inputBox') as HTMLTextAreaElement | null
+              if (!ta) return
+              ta.focus()
+              ta.setSelectionRange(0, ta.value.length)
+              document.execCommand('insertText', false, formatCode(code))
+            }}
+            className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50"
+            title="Format code"
+          >Format</button>
+          <button onClick={saveFile} disabled={saving}
+            className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+          >{saving ? 'Saving…' : 'Save'}</button>
+        </>
+      )}
+      {!canEdit && (
         <button onClick={forkWorkspace} disabled={forking}
           className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded font-semibold border border-gray-300"
         >{forking ? 'Forking…' : '⑂ Fork'}</button>
