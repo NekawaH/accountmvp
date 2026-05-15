@@ -40,7 +40,7 @@ export default function UserProfilePage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center pt-16 px-4">
       <div className="w-full max-w-2xl">
         {/* Back */}
-        <button onClick={() => router.push('/')} className="text-sm text-gray-500 hover:text-gray-700 mb-8 block">← Back</button>
+        <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700 mb-8 block">← Back</button>
 
         {/* Profile header */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm flex items-center gap-5 mb-6">
