@@ -53,7 +53,7 @@ model WorkspaceInvitation {
   from        User      @relation("InvitationsSent", fields: [fromUserId], references: [id], onDelete: Cascade)
   to          User      @relation("InvitationsReceived", fields: [toUserId], references: [id], onDelete: Cascade)
 
-  @@unique([workspaceId, toUserId])
+  @@index([workspaceId, toUserId])
 }
 
 model WorkspaceCollaborator {

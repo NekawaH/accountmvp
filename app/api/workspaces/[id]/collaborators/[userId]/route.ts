@@ -18,11 +18,8 @@ export async function DELETE(
     where: { workspaceId_userId: { workspaceId: params.id, userId: params.userId } },
   })
 
-  // Create a removal notice for the removed user (upsert in case a prior invitation record exists)
-  await prisma.workspaceInvitation.upsert({
-    where: { workspaceId_toUserId: { workspaceId: params.id, toUserId: params.userId } },
-    update: { status: 'REMOVED', fromUserId: session.userId, seenByFrom: true },
-    create: {
+  await prisma.workspaceInvitation.create({
+    data: {
       workspaceId: params.id,
       fromUserId: session.userId,
       toUserId: params.userId,

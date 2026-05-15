@@ -22,10 +22,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   })
   if (alreadyCollab) return NextResponse.json({ error: 'User is already a collaborator' }, { status: 409 })
 
-  const invitation = await prisma.workspaceInvitation.upsert({
-    where: { workspaceId_toUserId: { workspaceId: params.id, toUserId: target.id } },
-    create: { workspaceId: params.id, fromUserId: session.userId, toUserId: target.id },
-    update: { status: 'PENDING', fromUserId: session.userId },
+  const pendingInvite = await prisma.workspaceInvitation.findFirst({
+    where: { workspaceId: params.id, toUserId: target.id, status: 'PENDING' },
+  })
+  if (pendingInvite) return NextResponse.json({ error: 'Invitation already sent' }, { status: 409 })
+
+  const invitation = await prisma.workspaceInvitation.create({
+    data: { workspaceId: params.id, fromUserId: session.userId, toUserId: target.id },
   })
 
   return NextResponse.json(invitation, { status: 201 })
