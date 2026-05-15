@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import WorkspaceShell, { formatCode } from '../../components/WorkspaceShell'
+import WorkspaceShell, { formatCode, EXAMPLES } from '../../components/WorkspaceShell'
 
 interface PseudoFile {
   id: string
@@ -13,99 +13,6 @@ interface PseudoFile {
 interface LoadedFile extends PseudoFile {
   content: string
 }
-
-const EXAMPLES = [
-  {
-    label: 'Bubble Sort',
-    filename: 'bubble_sort.psc',
-    code: `DECLARE Values : ARRAY[1:100] OF REAL
-
-PROCEDURE SwapValue(BYREF X : REAL, Y : REAL)
-    Temp <- X
-    X <- Y
-    Y <- Temp
-ENDPROCEDURE
-
-INPUT N
-FOR Index <- 1 TO N
-    INPUT Values[Index]
-NEXT Index
-Last <- N
-REPEAT
-    Swap <- FALSE
-        FOR Index <- 1 TO Last - 1
-            IF Values[Index] > Values[Index + 1] THEN
-                CALL SwapValue(Values[Index], Values[Index + 1])
-                Swap <- TRUE
-            ENDIF
-        NEXT Index
-        Last <- Last - 1
-UNTIL NOT Swap OR Last = 1
-FOR Index <- 1 TO N
-    OUTPUT Values[Index]
-NEXT Index`,
-  },
-  {
-    label: 'Factorial',
-    filename: 'factorial.psc',
-    code: `FUNCTION F(X:INTEGER) RETURNS INTEGER
-    IF X = 0 THEN
-        RETURN 1
-    ELSE
-        RETURN X * F(X-1)
-    ENDIF
-ENDFUNCTION
-
-INPUT N
-OUTPUT F(N)`,
-  },
-  {
-    label: 'Linear Search',
-    filename: 'linear_search.psc',
-    code: `DECLARE Values : ARRAY[1:100] OF INTEGER
-INPUT N
-FOR Index <- 1 TO N
-    INPUT Values[Index]
-NEXT Index
-INPUT X
-Flag <- FALSE
-Index <- 0
-REPEAT
-    Index <- Index + 1
-    IF Values[Index] = X THEN
-        OUTPUT "Position: ", Index
-        Flag <- TRUE
-    ENDIF
-UNTIL Index = N OR Flag
-IF NOT Flag THEN
-    OUTPUT "Not found"
-ENDIF`,
-  },
-  {
-    label: 'File Handling',
-    filename: 'file_handling.psc',
-    code: `PROCEDURE PrintFile(File:STRING)
-    OPENFILE File FOR READ
-    WHILE NOT EOF(File) DO
-        READFILE File, Line
-        OUTPUT Line
-    ENDWHILE
-    CLOSEFILE File
-ENDPROCEDURE
-
-OPENFILE "File.txt" FOR WRITE
-WRITEFILE "File.txt", "hello world"
-WRITEFILE "File.txt", "lets learn pseudocode"
-CLOSEFILE "File.txt"
-
-OPENFILE "File.txt" FOR APPEND
-WRITEFILE "File.txt", "new line"
-WRITEFILE "File.txt", "another line"
-CLOSEFILE "File.txt"
-
-CALL PrintFile("File.txt")`,
-  },
-]
 
 export default function WorkspacePage() {
   const { id: workspaceId } = useParams<{ id: string }>()
