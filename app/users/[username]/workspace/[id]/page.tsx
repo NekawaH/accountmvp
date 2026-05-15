@@ -30,6 +30,8 @@ export default function PublicWorkspacePage() {
   const [notFound, setNotFound] = useState(false)
   const [isCollaborator, setIsCollaborator] = useState(false)
   const [showExamples, setShowExamples] = useState(false)
+  const [showNewFile, setShowNewFile] = useState(false)
+  const [newFileName, setNewFileName] = useState('')
   const vfsMirror = useRef<Record<string, string>>({})
 
   const load = useCallback(async () => {
@@ -74,6 +76,26 @@ export default function PublicWorkspacePage() {
     setCode(content)
   }
 
+  async function createFile() {
+    let name = newFileName.trim()
+    if (!name) return
+    if (!name.endsWith('.psc') && !name.endsWith('.txt')) name += '.psc'
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId, name, content: '' }),
+    })
+    if (res.ok) {
+      const created: LoadedFile = await res.json()
+      vfsMirror.current[name] = ''
+      setFiles(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+      setNewFileName('')
+      setShowNewFile(false)
+      setActiveFile(created)
+      setCode('')
+    }
+  }
+
   async function saveFile() {
     if (!activeFile) return
     setSaving(true)
@@ -116,7 +138,16 @@ export default function PublicWorkspacePage() {
             <span className="text-sm font-medium text-gray-700 truncate">{ws.user.username}</span>
           </button>
         )}
-        <p className="text-xs text-gray-500 mt-1.5 truncate font-semibold">{ws?.name}</p>
+        <div className="flex items-center justify-between mt-1.5">
+          <p className="text-xs text-gray-500 truncate font-semibold">{ws?.name}</p>
+          {canEdit && (
+            <button
+              onClick={() => setShowNewFile(v => !v)}
+              className="text-blue-600 hover:text-blue-800 text-xl font-bold leading-none flex-shrink-0 ml-1"
+              title="New file"
+            >+</button>
+          )}
+        </div>
         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
           {isCollaborator
             ? <span className="text-xs px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded font-medium">Collaborating</span>
@@ -136,13 +167,36 @@ export default function PublicWorkspacePage() {
         )}
       </div>
 
+      {canEdit && showNewFile && (
+        <div className="p-2 border-b border-gray-200 flex gap-1">
+          <input
+            className="flex-1 text-xs border border-gray-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 min-w-0"
+            placeholder="name.psc"
+            value={newFileName}
+            onChange={e => setNewFileName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') createFile()
+              if (e.key === 'Escape') { setShowNewFile(false); setNewFileName('') }
+            }}
+            autoFocus
+          />
+          <button onClick={createFile} className="text-xs bg-blue-600 text-white px-2 rounded hover:bg-blue-700 flex-shrink-0">OK</button>
+          <button onClick={() => { setShowNewFile(false); setNewFileName('') }} className="text-xs bg-gray-100 hover:bg-gray-200 px-2 rounded flex-shrink-0">✕</button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto">
         {files.map(f => (
           <div
             key={f.id}
             onClick={() => openFile(f)}
             className={`px-3 py-1.5 cursor-pointer text-sm truncate ${activeFile?.id === f.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
-          >{f.name}</div>
+          >
+            {f.name}
+            {activeFile?.id === f.id && code !== (vfsMirror.current[f.name] ?? '') && (
+              <span className="ml-1 text-yellow-500" title="Unsaved changes">●</span>
+            )}
+          </div>
         ))}
       </div>
 
@@ -204,7 +258,6 @@ export default function PublicWorkspacePage() {
       activeFileName={activeFile?.name ?? null}
       showPrompts={showPrompts}
       setShowPrompts={setShowPrompts}
-      onCodeChange={canEdit ? (v: string) => { if (activeFile) vfsMirror.current[activeFile.name] = v } : undefined}
       readOnly={!canEdit}
       toolbarExtras={toolbarExtras}
       sidebar={sidebar}
