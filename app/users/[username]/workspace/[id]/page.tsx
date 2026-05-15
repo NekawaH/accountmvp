@@ -75,6 +75,22 @@ export default function PublicWorkspacePage() {
     setCode(content)
   }
 
+  async function loadExample(filename: string, exCode: string) {
+    setShowExamples(false)
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId, name: filename, content: exCode }),
+    })
+    if (res.ok) {
+      const created: LoadedFile = await res.json()
+      vfsMirror.current[filename] = exCode
+      setFiles(prev => [...prev.filter(f => f.name !== filename), created].sort((a, b) => a.name.localeCompare(b.name)))
+      setActiveFile(created)
+      setCode(exCode)
+    }
+  }
+
   async function createFile() {
     let name = newFileName.trim()
     if (!name) return
@@ -221,7 +237,7 @@ export default function PublicWorkspacePage() {
             {showExamples && (
               <div className="absolute right-0 top-8 z-10 bg-white border border-gray-200 rounded shadow-lg w-44">
                 {EXAMPLES.map(ex => (
-                  <button key={ex.label} onClick={() => { setCode(ex.code); setShowExamples(false) }}
+                  <button key={ex.label} onClick={() => loadExample(ex.filename, ex.code)}
                     className="block w-full text-left text-sm px-3 py-2 hover:bg-gray-50"
                   >{ex.label}</button>
                 ))}
