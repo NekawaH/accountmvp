@@ -73,7 +73,7 @@ export default function UserProfilePage() {
                   {/* Contributor avatars */}
                   <div className="flex items-center flex-shrink-0">
                     {/* Owner with crown */}
-                    <div className="relative">
+                    <div className="relative" style={{ zIndex: 4 }}>
                       {profile?.avatarUrl
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <img src={profile.avatarUrl} alt={username} title={`${username} (owner)`} className="w-7 h-7 rounded-full object-cover ring-2 ring-yellow-400" />

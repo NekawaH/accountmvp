@@ -172,7 +172,7 @@ export default function DashboardPage() {
                     >
                       {/* Stacked avatars: owner first (with crown), then collaborators */}
                       <div className="flex items-center flex-shrink-0">
-                        <div className="relative">
+                        <div className="relative" style={{ zIndex: 4 }}>
                           {ws.user.avatarUrl
                             // eslint-disable-next-line @next/next/no-img-element
                             ? <img src={ws.user.avatarUrl} alt={ws.user.username} title={`${ws.user.username} (owner)`} className="w-7 h-7 rounded-full object-cover ring-2 ring-yellow-400" />
@@ -253,7 +253,7 @@ export default function DashboardPage() {
                     </button>
                     {/* Contributor avatars */}
                     <div className="flex items-center flex-shrink-0 mx-3">
-                      <div className="relative">
+                      <div className="relative" style={{ zIndex: 4 }}>
                         {profile?.avatarUrl
                           // eslint-disable-next-line @next/next/no-img-element
                           ? <img src={profile.avatarUrl} alt={profile.username} title={`${profile.username} (owner)`} className="w-7 h-7 rounded-full object-cover ring-2 ring-yellow-400" />
@@ -301,7 +301,7 @@ export default function DashboardPage() {
                   </div>
                   {/* Contributor avatars */}
                   <div className="flex items-center flex-shrink-0 ml-3">
-                    <div className="relative">
+                    <div className="relative" style={{ zIndex: 4 }}>
                       {ws.user.avatarUrl
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <img src={ws.user.avatarUrl} alt={ws.user.username} title={`${ws.user.username} (owner)`} className="w-7 h-7 rounded-full object-cover ring-2 ring-yellow-400" />
