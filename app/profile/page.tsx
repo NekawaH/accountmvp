@@ -70,7 +70,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gray-50 flex flex-col items-center pt-16 px-4">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 mb-8">
-          <button onClick={() => router.push('/')} className="text-sm text-gray-500 hover:text-gray-700">← Workspaces</button>
+          <button onClick={() => router.back()} className="text-sm text-gray-500 hover:text-gray-700">← Back</button>
         </div>
 
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
