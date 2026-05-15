@@ -14,6 +14,7 @@ interface ReceivedInvitation {
 interface SentInvitation {
   id: string
   status: string
+  seenByFrom: boolean
   createdAt: string
   workspace: { id: string; name: string }
   to: { username: string; avatarUrl: string }
@@ -44,7 +45,7 @@ export default function NoticesPage() {
       body: JSON.stringify({ action }),
     })
     if (res.ok) {
-      setReceived(prev => prev.filter(inv => inv.id !== id))
+      setReceived(prev => prev.map(inv => inv.id === id ? { ...inv, status: action === 'accept' ? 'ACCEPTED' : 'DECLINED' } : inv))
       if (action === 'accept') {
         const inv = received.find(i => i.id === id)
         if (inv) router.push(`/users/${inv.from.username}/workspace/${inv.workspace.id}`)
@@ -88,18 +89,26 @@ export default function NoticesPage() {
                       </p>
                       <p className="text-xs text-gray-400 mt-0.5">{new Date(inv.createdAt).toLocaleDateString()}</p>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => respond(inv.id, 'accept')}
-                        disabled={responding === inv.id}
-                        className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
-                      >Accept</button>
-                      <button
-                        onClick={() => respond(inv.id, 'decline')}
-                        disabled={responding === inv.id}
-                        className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded-lg font-medium transition-colors"
-                      >Decline</button>
-                    </div>
+                    {inv.status === 'PENDING' ? (
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => respond(inv.id, 'accept')}
+                          disabled={responding === inv.id}
+                          className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors"
+                        >Accept</button>
+                        <button
+                          onClick={() => respond(inv.id, 'decline')}
+                          disabled={responding === inv.id}
+                          className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded-lg font-medium transition-colors"
+                        >Decline</button>
+                      </div>
+                    ) : (
+                      <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${
+                        inv.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                      }`}>
+                        {inv.status === 'ACCEPTED' ? 'Accepted' : 'Declined'}
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>
@@ -109,23 +118,26 @@ export default function NoticesPage() {
               <div className="space-y-3">
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sent Invitations</h2>
                 {sent.map(inv => (
-                  <div key={inv.id} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex items-center gap-4">
+                  <div key={inv.id} className={`bg-white border rounded-xl px-5 py-4 shadow-sm flex items-center gap-4 ${!inv.seenByFrom ? 'border-blue-300' : 'border-gray-200'}`}>
                     {inv.to.avatarUrl
                       // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={inv.to.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
                       : <div className="w-10 h-10 rounded-full bg-gray-200 flex-shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800">
-                        <span className="font-semibold">{inv.to.username}</span>
-                        {' '}{inv.status === 'ACCEPTED' ? 'accepted' : 'declined'} your invitation to{' '}
-                        <span className="font-semibold">{inv.workspace.name}</span>
-                      </p>
-                      <p className="text-xs text-gray-400 mt-0.5">{new Date(inv.createdAt).toLocaleDateString()}</p>
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-800">
+                          <span className="font-semibold">{inv.to.username}</span>
+                          {' '}{inv.status === 'ACCEPTED' ? 'accepted' : 'declined'} your invitation to{' '}
+                          <span className="font-semibold">{inv.workspace.name}</span>
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">{new Date(inv.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      {!inv.seenByFrom && (
+                        <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
+                      )}
                     </div>
                     <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${
-                      inv.status === 'ACCEPTED'
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-500'
+                      inv.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                     }`}>
                       {inv.status === 'ACCEPTED' ? 'Accepted' : 'Declined'}
                     </span>

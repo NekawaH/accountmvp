@@ -6,9 +6,14 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ count: 0 })
 
-  const count = await prisma.workspaceInvitation.count({
-    where: { toUserId: session.userId, status: 'PENDING' },
-  })
+  const [pendingReceived, unseenResponses] = await Promise.all([
+    prisma.workspaceInvitation.count({
+      where: { toUserId: session.userId, status: 'PENDING' },
+    }),
+    prisma.workspaceInvitation.count({
+      where: { fromUserId: session.userId, status: { in: ['ACCEPTED', 'DECLINED'] }, seenByFrom: false },
+    }),
+  ])
 
-  return NextResponse.json({ count })
+  return NextResponse.json({ count: pendingReceived + unseenResponses })
 }

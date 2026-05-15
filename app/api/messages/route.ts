@@ -8,7 +8,7 @@ export async function GET() {
 
   const [received, sent] = await Promise.all([
     prisma.workspaceInvitation.findMany({
-      where: { toUserId: session.userId, status: 'PENDING' },
+      where: { toUserId: session.userId },
       include: {
         workspace: { select: { id: true, name: true } },
         from: { select: { username: true, avatarUrl: true } },
@@ -24,6 +24,15 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     }),
   ])
+
+  // Mark unseen responses as seen now that the sender is viewing them
+  const unseenIds = sent.filter(i => !i.seenByFrom).map(i => i.id)
+  if (unseenIds.length > 0) {
+    await prisma.workspaceInvitation.updateMany({
+      where: { id: { in: unseenIds } },
+      data: { seenByFrom: true },
+    })
+  }
 
   return NextResponse.json({ received, sent })
 }

@@ -46,6 +46,7 @@ model WorkspaceInvitation {
   fromUserId  String
   toUserId    String
   status      String    @default("PENDING")
+  seenByFrom  Boolean   @default(false)
   createdAt   DateTime  @default(now())
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   from        User      @relation("InvitationsSent", fields: [fromUserId], references: [id], onDelete: Cascade)
