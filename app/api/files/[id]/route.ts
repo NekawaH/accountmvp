@@ -57,7 +57,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const existing = await getFile(session.userId, params.id)
+  const existing = await canEditFile(session.userId, params.id)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   await prisma.pseudoFile.delete({ where: { id: params.id } })

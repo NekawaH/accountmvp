@@ -3,7 +3,13 @@ import { getSession } from '@/lib/session'
 import { NextRequest, NextResponse } from 'next/server'
 
 async function authorizeWorkspace(userId: string, workspaceId: string) {
-  return prisma.workspace.findFirst({ where: { id: workspaceId, userId } })
+  const ws = await prisma.workspace.findUnique({ where: { id: workspaceId } })
+  if (!ws) return null
+  if (ws.userId === userId) return ws
+  const collab = await prisma.workspaceCollaborator.findUnique({
+    where: { workspaceId_userId: { workspaceId, userId } },
+  })
+  return collab ? ws : null
 }
 
 export async function GET(req: NextRequest) {

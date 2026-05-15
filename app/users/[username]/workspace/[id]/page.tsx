@@ -32,6 +32,7 @@ export default function PublicWorkspacePage() {
   const [showExamples, setShowExamples] = useState(false)
   const [showNewFile, setShowNewFile] = useState(false)
   const [newFileName, setNewFileName] = useState('')
+  const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null)
   const vfsMirror = useRef<Record<string, string>>({})
 
   const load = useCallback(async () => {
@@ -123,6 +124,14 @@ export default function PublicWorkspacePage() {
     setSaving(false)
   }
 
+  async function deleteFile(f: PseudoFile) {
+    await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
+    if (activeFile?.id === f.id) { setActiveFile(null); setCode('') }
+    delete vfsMirror.current[f.name]
+    setConfirmDeleteFileId(null)
+    setFiles(prev => prev.filter(x => x.id !== f.id))
+  }
+
   async function forkWorkspace() {
     setForking(true)
     const res = await fetch(`/api/workspaces/${workspaceId}/fork`, { method: 'POST' })
@@ -206,12 +215,29 @@ export default function PublicWorkspacePage() {
         {files.map(f => (
           <div
             key={f.id}
-            onClick={() => openFile(f)}
-            className={`px-3 py-1.5 cursor-pointer text-sm truncate ${activeFile?.id === f.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
+            className={`px-2 py-1.5 text-sm group ${activeFile?.id === f.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-100 text-gray-700'}`}
           >
-            {f.name}
-            {activeFile?.id === f.id && code !== (vfsMirror.current[f.name] ?? '') && (
-              <span className="ml-1 text-yellow-500" title="Unsaved changes">●</span>
+            {canEdit && confirmDeleteFileId === f.id ? (
+              <div className="flex items-center gap-1">
+                <span className="truncate flex-1 text-xs text-gray-600">Delete <span className="font-medium">{f.name}</span>?</span>
+                <button onClick={() => deleteFile(f)} className="text-xs px-1.5 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded font-medium flex-shrink-0">Yes</button>
+                <button onClick={() => setConfirmDeleteFileId(null)} className="text-xs px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded font-medium flex-shrink-0">No</button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between cursor-pointer" onClick={() => openFile(f)}>
+                <span className="truncate flex-1">
+                  {f.name}
+                  {activeFile?.id === f.id && code !== (vfsMirror.current[f.name] ?? '') && (
+                    <span className="ml-1 text-yellow-500" title="Unsaved changes">●</span>
+                  )}
+                </span>
+                {canEdit && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setConfirmDeleteFileId(f.id) }}
+                    className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 ml-1 text-xs flex-shrink-0"
+                  >✕</button>
+                )}
+              </div>
             )}
           </div>
         ))}
