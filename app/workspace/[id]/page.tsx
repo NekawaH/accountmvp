@@ -14,6 +14,11 @@ interface LoadedFile extends PseudoFile {
   content: string
 }
 
+interface Collaborator {
+  userId: string
+  user: { username: string; avatarUrl: string }
+}
+
 export default function WorkspacePage() {
   const { id: workspaceId } = useParams<{ id: string }>()
   const router = useRouter()
@@ -27,6 +32,7 @@ export default function WorkspacePage() {
   const [saving, setSaving] = useState(false)
   const [showPrompts, setShowPrompts] = useState(true)
   const [workspaceName, setWorkspaceName] = useState('')
+  const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [filesLoading, setFilesLoading] = useState(true)
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
@@ -78,7 +84,7 @@ export default function WorkspacePage() {
   useEffect(() => {
     fetch(`/api/workspaces/${workspaceId}`)
       .then(r => r.ok ? r.json() : null)
-      .then(ws => ws && setWorkspaceName(ws.name))
+      .then(ws => { if (ws) { setWorkspaceName(ws.name); setCollaborators(ws.collaborators ?? []) } })
     loadFileList()
   }, [workspaceId, loadFileList])
 
@@ -247,8 +253,16 @@ export default function WorkspacePage() {
     })
     const json = await res.json()
     setInviteStatus({ ok: res.ok, msg: res.ok ? `Invitation sent to ${inviteUsername.trim()}` : (json.error ?? 'Error') })
-    if (res.ok) { setInviteUsername(''); setSearchResults([]) }
+    if (res.ok) {
+      setInviteUsername('')
+      setSearchResults([])
+    }
     setInviting(false)
+  }
+
+  async function removeCollaborator(userId: string) {
+    const res = await fetch(`/api/workspaces/${workspaceId}/collaborators/${userId}`, { method: 'DELETE' })
+    if (res.ok) setCollaborators(prev => prev.filter(c => c.userId !== userId))
   }
 
   async function onBeforeRun() {
@@ -429,6 +443,24 @@ export default function WorkspacePage() {
           </div>
         ) : (
           <button onClick={() => setShowInvite(true)} className="block w-full text-xs text-center text-blue-600 hover:text-blue-700 font-medium">+ Invite collaborator</button>
+        )}
+        {collaborators.length > 0 && (
+          <div className="space-y-1 pt-1">
+            {collaborators.map(c => (
+              <div key={c.userId} className="flex items-center gap-1.5 group">
+                {c.user.avatarUrl
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={c.user.avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
+                  : <div className="w-4 h-4 rounded-full bg-gray-200 flex-shrink-0" />}
+                <span className="text-xs text-gray-600 truncate flex-1">{c.user.username}</span>
+                <button
+                  onClick={() => removeCollaborator(c.userId)}
+                  className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs flex-shrink-0"
+                  title="Remove collaborator"
+                >✕</button>
+              </div>
+            ))}
+          </div>
         )}
         <button
           onClick={() => safeNavigate(() => router.push('/'))}

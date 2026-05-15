@@ -25,14 +25,20 @@ export async function GET() {
     }),
   ])
 
-  // Mark unseen responses as seen now that the sender is viewing them
-  const unseenIds = sent.filter(i => !i.seenByFrom).map(i => i.id)
-  if (unseenIds.length > 0) {
-    await prisma.workspaceInvitation.updateMany({
-      where: { id: { in: unseenIds } },
+  // Mark unseen items as seen now that the user is viewing them
+  const unseenFromIds = sent.filter(i => !i.seenByFrom).map(i => i.id)
+  const unseenToIds = received.filter(i => i.status === 'REMOVED' && !i.seenByTo).map(i => i.id)
+
+  await Promise.all([
+    unseenFromIds.length > 0 && prisma.workspaceInvitation.updateMany({
+      where: { id: { in: unseenFromIds } },
       data: { seenByFrom: true },
-    })
-  }
+    }),
+    unseenToIds.length > 0 && prisma.workspaceInvitation.updateMany({
+      where: { id: { in: unseenToIds } },
+      data: { seenByTo: true },
+    }),
+  ])
 
   return NextResponse.json({ received, sent })
 }
