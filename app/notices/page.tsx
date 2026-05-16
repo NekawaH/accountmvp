@@ -29,13 +29,27 @@ export default function NoticesPage() {
   const [responding, setResponding] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/messages')
-      .then(r => r.ok ? r.json() : { received: [], sent: [] })
-      .then(data => {
-        setReceived(data.received ?? [])
-        setSent(data.sent ?? [])
-      })
-      .finally(() => setLoading(false))
+    let cancelled = false
+    const load = (initial = false) =>
+      fetch('/api/messages')
+        .then(r => r.ok ? r.json() : { received: [], sent: [] })
+        .then(data => {
+          if (cancelled) return
+          setReceived(data.received ?? [])
+          setSent(data.sent ?? [])
+        })
+        .catch(() => {})
+        .finally(() => { if (initial && !cancelled) setLoading(false) })
+
+    load(true)
+    const interval = setInterval(() => load(), 15000)
+    const onFocus = () => load()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [])
 
   async function respond(id: string, action: 'accept' | 'decline') {

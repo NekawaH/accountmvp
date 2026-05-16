@@ -32,8 +32,18 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.ok ? r.json() : []).then(setWorkspaces).finally(() => setLoading(false))
     fetch('/api/profile').then(r => r.ok ? r.json() : null).then(setProfile)
-    fetch('/api/messages/count').then(r => r.ok ? r.json() : { count: 0 }).then(d => setNoticeCount(d.count))
     fetch('/api/workspaces/collaborations').then(r => r.ok ? r.json() : []).then(setCollabWorkspaces)
+
+    const loadCount = () =>
+      fetch('/api/messages/count').then(r => r.ok ? r.json() : { count: 0 }).then(d => setNoticeCount(d.count)).catch(() => {})
+    loadCount()
+    const interval = setInterval(loadCount, 15000)
+    const onFocus = () => loadCount()
+    window.addEventListener('focus', onFocus)
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+    }
   }, [])
 
   // Debounced search (users + workspaces)
