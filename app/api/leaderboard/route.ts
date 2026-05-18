@@ -1,6 +1,10 @@
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
+// Always query fresh — Next.js otherwise treats this handler as static and
+// returns a snapshot from build time.
+export const dynamic = 'force-dynamic'
+
 // Public leaderboard. Score = sum of difficulty across distinct problems
 // the user has at least one passing submission for. Tie-break: earliest
 // final-solve time (the time of the user's most recent first-pass), ascending.
