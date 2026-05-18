@@ -173,6 +173,19 @@ export default function PublicWorkspacePage() {
     }
   }
 
+  async function onBeforeRun() {
+    const w = window as any
+    if (canEdit && activeFile) {
+      vfsMirror.current[activeFile.name] = code
+      await fetch(`/api/files/${activeFile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: code }),
+      })
+    }
+    w.vfs = { ...vfsMirror.current }
+  }
+
   if (notFound) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
@@ -358,6 +371,7 @@ export default function PublicWorkspacePage() {
         setShowPrompts={setShowPrompts}
         readOnly={!canEdit}
         toolbarExtras={toolbarExtras}
+        onBeforeRun={onBeforeRun}
         sidebar={sidebar}
       />
     </>

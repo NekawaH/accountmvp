@@ -289,10 +289,15 @@ export default function WorkspacePage() {
     const w = window as any
     if (activeFile && activeFile.name.endsWith('.psc')) {
       vfsMirror.current[activeFile.name] = code
-      fetch(`/api/files/${activeFile.id}`, {
+      await fetch(`/api/files/${activeFile.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: code }),
+      })
+      delete drafts.current[activeFile.id]
+      setDirtyIds(prev => {
+        if (!prev.has(activeFile.id)) return prev
+        const next = new Set(prev); next.delete(activeFile.id); return next
       })
     }
     w.vfs = { ...vfsMirror.current }
