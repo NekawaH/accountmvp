@@ -49,6 +49,7 @@ export default function WorkspacePage() {
   const [searchResults, setSearchResults] = useState<{ username: string; avatarUrl: string | null }[]>([])
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const vfsMirror = useRef<Record<string, string>>({})
+  const creatingFileRef = useRef(false)
 
   const loadFileList = useCallback(async () => {
     const res = await fetch(`/api/files?workspaceId=${workspaceId}&withContent=true`)
@@ -161,22 +162,40 @@ export default function WorkspacePage() {
   }
 
   async function createFile() {
+    if (creatingFileRef.current) return
     let name = newFileName.trim()
     if (!name) return
     if (!name.endsWith('.psc') && !name.endsWith('.txt')) name += '.psc'
-    const res = await fetch('/api/files', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workspaceId, name, content: '' }),
-    })
-    if (res.ok) {
-      const created: LoadedFile = await res.json()
-      vfsMirror.current[name] = ''
-      setFiles(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+    // Reject duplicates client-side to avoid creating two files with the same name.
+    if (files.some(f => f.name === name)) {
       setNewFileName('')
       setShowNewFile(false)
-      setActiveFile(created)
-      setCode('')
+      const existing = files.find(f => f.name === name)
+      if (existing) openFile(existing)
+      return
+    }
+    creatingFileRef.current = true
+    // Clear the input immediately so a rapid second click/Enter is a no-op.
+    setNewFileName('')
+    setShowNewFile(false)
+    try {
+      const res = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, name, content: '' }),
+      })
+      if (res.ok) {
+        const created: LoadedFile = await res.json()
+        vfsMirror.current[name] = ''
+        setFiles(prev => {
+          if (prev.some(f => f.id === created.id || f.name === created.name)) return prev
+          return [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+        })
+        setActiveFile(created)
+        setCode('')
+      }
+    } finally {
+      creatingFileRef.current = false
     }
   }
 

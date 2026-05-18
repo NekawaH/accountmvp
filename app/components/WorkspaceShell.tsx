@@ -242,6 +242,13 @@ export default function WorkspaceShell({
   }
 
   async function runCode() {
+    if (activeFileName && !activeFileName.endsWith('.psc')) {
+      if (terminalRef.current) {
+        terminalRef.current.value += (terminalRef.current.value ? '\n' : '') +
+          `Error: only .psc files can be executed (current file: ${activeFileName}).`
+      }
+      return
+    }
     initInterpreter()
     const w = window as any
     if (!w.pseudoIDE) {

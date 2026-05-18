@@ -34,6 +34,7 @@ export default function PublicWorkspacePage() {
   const [newFileName, setNewFileName] = useState('')
   const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null)
   const vfsMirror = useRef<Record<string, string>>({})
+  const creatingFileRef = useRef(false)
 
   const load = useCallback(async () => {
     const [wsRes, profileRes, filesRes] = await Promise.all([
@@ -93,22 +94,38 @@ export default function PublicWorkspacePage() {
   }
 
   async function createFile() {
+    if (creatingFileRef.current) return
     let name = newFileName.trim()
     if (!name) return
     if (!name.endsWith('.psc') && !name.endsWith('.txt')) name += '.psc'
-    const res = await fetch('/api/files', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workspaceId, name, content: '' }),
-    })
-    if (res.ok) {
-      const created: LoadedFile = await res.json()
-      vfsMirror.current[name] = ''
-      setFiles(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)))
+    if (files.some(f => f.name === name)) {
       setNewFileName('')
       setShowNewFile(false)
-      setActiveFile(created)
-      setCode('')
+      const existing = files.find(f => f.name === name)
+      if (existing) openFile(existing)
+      return
+    }
+    creatingFileRef.current = true
+    setNewFileName('')
+    setShowNewFile(false)
+    try {
+      const res = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, name, content: '' }),
+      })
+      if (res.ok) {
+        const created: LoadedFile = await res.json()
+        vfsMirror.current[name] = ''
+        setFiles(prev => {
+          if (prev.some(f => f.id === created.id || f.name === created.name)) return prev
+          return [...prev, created].sort((a, b) => a.name.localeCompare(b.name))
+        })
+        setActiveFile(created)
+        setCode('')
+      }
+    } finally {
+      creatingFileRef.current = false
     }
   }
 
