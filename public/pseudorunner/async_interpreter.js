@@ -1163,12 +1163,14 @@
                 }
                 case 'while':
                     while (await evalExpr(node.condition, localBindings, instance)) {
+                        if (stepLimit > 0 && ++stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
                         const r = await execBlock(node.body, localBindings, instance);
                         if (r && r.__returned) return r;
                     }
                     return null;
                 case 'repeat': {
                     do {
+                        if (stepLimit > 0 && ++stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
                         const r = await execBlock(node.body, localBindings, instance);
                         if (r && r.__returned) return r;
                     } while (!(await evalExpr(node.until, localBindings, instance)));
@@ -1179,6 +1181,7 @@
                     const end = await evalExpr(node.end, localBindings, instance);
                     setVar(node.var, cur);
                     while (getVar(node.var) <= end) {
+                        if (stepLimit > 0 && ++stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
                         const r = await execBlock(node.body, localBindings, instance);
                         if (r && r.__returned) return r;
                         setVar(node.var, getVar(node.var) + 1);
