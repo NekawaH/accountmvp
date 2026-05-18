@@ -26,7 +26,7 @@ export interface GradeResult {
   cases: CaseResult[]
 }
 
-const PER_CASE_TIMEOUT_MS = 200
+const PER_CASE_TIMEOUT_MS = 1
 
 let cachedSource: string | null = null
 function loadInterpreterSource(): string {
