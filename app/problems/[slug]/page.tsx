@@ -39,6 +39,69 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
       .then(setProblem)
   }, [params.slug])
 
+  // Code-editor key handling: Tab inserts 4 spaces (or indents the selected
+  // block; Shift+Tab dedents), Enter preserves the current line's leading
+  // indent, Backspace at a whitespace-only line start removes up to 4 spaces.
+  // Uses document.execCommand so React's onChange fires and state stays in
+  // sync — direct .value assignment would silently desync controlled inputs.
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    const ta = e.currentTarget
+    const start = ta.selectionStart
+    const end = ta.selectionEnd
+    const val = ta.value
+
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      if (start !== end) {
+        // Block indent / dedent — operate on whole selected lines.
+        const blockStart = val.lastIndexOf('\n', start - 1) + 1
+        const blockEnd = end > start && val[end - 1] === '\n' ? end - 1 : end
+        const block = val.substring(blockStart, blockEnd)
+        const newBlock = e.shiftKey
+          ? block.split('\n').map(l => l.replace(/^ {1,4}/, '')).join('\n')
+          : block.split('\n').map(l => '    ' + l).join('\n')
+        ta.setSelectionRange(blockStart, blockEnd)
+        document.execCommand('insertText', false, newBlock)
+        ta.setSelectionRange(blockStart, blockStart + newBlock.length)
+      } else if (e.shiftKey) {
+        // Dedent current line.
+        const lineStart = val.lastIndexOf('\n', start - 1) + 1
+        const lineEndIdx = val.indexOf('\n', start)
+        const line = val.substring(lineStart, lineEndIdx === -1 ? val.length : lineEndIdx)
+        const m = line.match(/^ {1,4}/)
+        if (m) {
+          ta.setSelectionRange(lineStart, lineStart + m[0].length)
+          document.execCommand('delete')
+        }
+      } else {
+        document.execCommand('insertText', false, '    ')
+      }
+      return
+    }
+
+    if (e.key === 'Enter' && start === end) {
+      e.preventDefault()
+      const lineStart = val.lastIndexOf('\n', start - 1) + 1
+      const currentLine = val.substring(lineStart, start)
+      const indent = currentLine.match(/^\s*/)?.[0] ?? ''
+      document.execCommand('insertText', false, '\n' + indent)
+      return
+    }
+
+    if (e.key === 'Backspace' && start === end && start > 0) {
+      const lineStart = val.lastIndexOf('\n', start - 1) + 1
+      const beforeCursor = val.substring(lineStart, start)
+      if (beforeCursor.length > 0 && /^ +$/.test(beforeCursor)) {
+        e.preventDefault()
+        const col = beforeCursor.length
+        const target = col % 4 === 0 ? col - 4 : col - (col % 4)
+        const deleteCount = col - Math.max(0, target)
+        ta.setSelectionRange(start - deleteCount, start)
+        document.execCommand('delete')
+      }
+    }
+  }
+
   async function submit() {
     setSubmitting(true)
     setError('')
@@ -112,6 +175,7 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
       <textarea
         value={code}
         onChange={e => setCode(e.target.value)}
+        onKeyDown={handleKeyDown}
         spellCheck={false}
         className="w-full h-64 font-mono text-sm border rounded p-3"
       />
