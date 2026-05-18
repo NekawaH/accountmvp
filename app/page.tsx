@@ -148,9 +148,6 @@ export default function DashboardPage() {
                 : <div className="w-6 h-6 rounded-full bg-gray-200 shrink-0" />}
               <span className="text-sm text-gray-700 font-medium truncate">{profile?.username ?? '…'}</span>
             </button>
-            <form action="/api/auth/logout" method="POST">
-              <button type="submit" className="h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 text-sm font-medium text-gray-700 rounded-lg whitespace-nowrap">Sign out</button>
-            </form>
           </div>
         </div>
 

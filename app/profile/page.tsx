@@ -143,6 +143,15 @@ export default function ProfilePage() {
           >
             {saving ? 'Saving…' : 'Save changes'}
           </button>
+
+          <form action="/api/auth/logout" method="POST" className="mt-3">
+            <button
+              type="submit"
+              className="w-full py-2.5 bg-white border border-gray-300 hover:border-gray-400 text-gray-700 rounded-lg font-medium text-sm transition-colors"
+            >
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
     </div>
