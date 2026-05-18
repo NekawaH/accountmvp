@@ -14,11 +14,8 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
   })
   if (!problem) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const cases = (problem.testCases as any[]).map((tc, i) => ({
-    index: i,
-    stdin: tc.stdin ?? '',
-    // expectedStdout intentionally omitted
-  }))
+  // Neither stdin nor expectedStdout is exposed — only the test count.
+  const testCount = Array.isArray(problem.testCases) ? problem.testCases.length : 0
 
   return NextResponse.json({
     id: problem.id,
@@ -26,6 +23,6 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
     title: problem.title,
     statement: problem.statement,
     difficulty: problem.difficulty,
-    testCases: cases,
+    testCount,
   })
 }

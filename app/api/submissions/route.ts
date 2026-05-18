@@ -46,9 +46,8 @@ export async function POST(req: NextRequest) {
       passed: c.passed,
       timedOut: !!c.timedOut,
       error: c.error ?? null,
-      // Echo back the user's actual stdout for the first failing case to aid debugging
-      // (don't reveal expected output).
-      actualStdout: c.actualStdout,
+      // Do not echo actualStdout — it would reveal the hidden stdin (the
+      // interpreter echoes every INPUT value to stdout).
     })),
   })
 }

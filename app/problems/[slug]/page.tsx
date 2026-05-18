@@ -3,21 +3,19 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
-interface TestCase { index: number; stdin: string }
 interface Problem {
   id: string
   slug: string
   title: string
   statement: string
   difficulty: number
-  testCases: TestCase[]
+  testCount: number
 }
 interface CaseResult {
   index: number
   passed: boolean
   timedOut: boolean
   error: string | null
-  actualStdout: string
 }
 interface SubmitResult {
   passed: boolean
@@ -82,19 +80,9 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
         {problem.statement}
       </pre>
 
-      <details className="mb-4 text-sm">
-        <summary className="cursor-pointer text-gray-700">
-          Sample inputs ({problem.testCases.length} test{problem.testCases.length === 1 ? '' : 's'})
-        </summary>
-        <div className="mt-2 space-y-2">
-          {problem.testCases.map(tc => (
-            <div key={tc.index} className="border rounded p-2">
-              <div className="text-xs text-gray-500 mb-1">Test #{tc.index + 1} stdin</div>
-              <pre className="font-mono whitespace-pre-wrap">{tc.stdin || '(empty)'}</pre>
-            </div>
-          ))}
-        </div>
-      </details>
+      <p className="text-xs text-gray-500 mb-4">
+        {problem.testCount} hidden test{problem.testCount === 1 ? '' : 's'} — inputs are not shown.
+      </p>
 
       <label className="block text-sm font-medium mb-1">Your pseudocode</label>
       <textarea
@@ -138,14 +126,8 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
                     </span>
                   </span>
                 </div>
-                {!c.passed && (
-                  <>
-                    {c.error && <p className="text-xs text-red-600 mt-1">{c.error}</p>}
-                    <div className="text-xs text-gray-500 mt-1">Your output:</div>
-                    <pre className="font-mono whitespace-pre-wrap text-xs bg-gray-50 p-2 rounded">
-                      {c.actualStdout || '(empty)'}
-                    </pre>
-                  </>
+                {!c.passed && c.error && (
+                  <p className="text-xs text-red-600 mt-1">{c.error}</p>
                 )}
               </li>
             ))}
