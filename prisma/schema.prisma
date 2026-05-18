@@ -95,6 +95,7 @@ model WorkspaceCollaborator {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([workspaceId, userId])
+  @@index([userId, joinedAt])
 }
 
 model PseudoFile {
