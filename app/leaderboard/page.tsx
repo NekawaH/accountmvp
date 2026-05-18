@@ -55,7 +55,7 @@ export default function LeaderboardPage() {
                   <Link href={`/users/${r.username}`} className="flex items-center gap-2 hover:underline">
                     {r.avatarUrl && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.avatarUrl} alt="" className="w-6 h-6 rounded-full" />
+                      <img src={r.avatarUrl} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
                     )}
                     <span>{r.username}</span>
                   </Link>
