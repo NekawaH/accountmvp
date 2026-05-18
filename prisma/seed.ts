@@ -18,6 +18,22 @@ interface SeedProblem {
   testCases: { stdin: string; expectedStdout: string }[]
 }
 
+// Build a worst-case test for binary search: sorted distinct array [1..N],
+// target at the last position. A correct O(log N) solution finishes in well
+// under 2 s; a linear scan does N comparisons in the tree-walking interpreter
+// and trips the per-case timeout.
+function binarySearchStressCase(N: number, target: number) {
+  const parts: string[] = [String(N)]
+  for (let i = 1; i <= N; i++) parts.push(String(i))
+  parts.push(String(target))
+  const stdin = parts.join('\n') + '\n'
+  // The interpreter echoes every INPUT value to stdout; the program then
+  // outputs the 1-based index. Since array is [1..N], target's value equals
+  // its index, so expected output = echoes + target + '\n'.
+  const expectedStdout = stdin + String(target) + '\n'
+  return { stdin, expectedStdout }
+}
+
 const problems: SeedProblem[] = [
   {
     slug: 'hello-name',
@@ -117,7 +133,10 @@ const problems: SeedProblem[] = [
       'Read N, then N distinct integers sorted in ascending order (one per line), ' +
       'then a target value X.\n' +
       'Output the 1-based index of X in the list, or -1 if X is not present.\n' +
-      'You should implement binary search (the values are guaranteed sorted).',
+      '\n' +
+      'You MUST implement binary search — the largest test has N ≈ 50,000 and ' +
+      'the target placed at the worst-case position, so an O(N) linear scan ' +
+      'will time out.',
     difficulty: 3,
     examples: [{ input: '5\n1\n3\n5\n7\n9\n5', output: '3' }],
     testCases: [
@@ -126,6 +145,8 @@ const problems: SeedProblem[] = [
       { stdin: '4\n2\n4\n6\n8\n2\n',     expectedStdout: '4\n2\n4\n6\n8\n2\n1\n' },
       { stdin: '4\n2\n4\n6\n8\n8\n',     expectedStdout: '4\n2\n4\n6\n8\n8\n4\n' },
       { stdin: '1\n10\n10\n',            expectedStdout: '1\n10\n10\n1\n' },
+      // Stress test: linear search needs ~50,000 comparisons → TLE.
+      binarySearchStressCase(50000, 50000),
     ],
   },
   {
