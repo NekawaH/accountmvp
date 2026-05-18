@@ -33,11 +33,14 @@ const PER_CASE_TIMEOUT_MS = 1
 // maxSteps. Catches infinite loops; high enough that any realistic correct
 // solution stays under it. Problem-level maxSteps (when smaller) takes
 // precedence.
-const DEFAULT_STEP_CAP = 10_000_000
+const DEFAULT_STEP_CAP = 2_000_000
 
 let cachedSource: string | null = null
 function loadInterpreterSource(): string {
-  if (cachedSource) return cachedSource
+  // In development, always re-read so edits to async_interpreter.js take
+  // effect without restarting `next dev`. In production the file is frozen
+  // for the lifetime of the deploy, so caching is fine.
+  if (process.env.NODE_ENV === 'production' && cachedSource) return cachedSource
   const p = path.join(process.cwd(), 'public', 'pseudorunner', 'async_interpreter.js')
   cachedSource = fs.readFileSync(p, 'utf8')
   return cachedSource
