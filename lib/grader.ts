@@ -30,10 +30,10 @@ export interface GradeResult {
 const PER_CASE_TIMEOUT_MS = 1
 
 // Safety cap applied to every submission, even when the problem has no
-// maxSteps. Catches infinite loops; high enough that any realistic correct
-// solution stays under it. Problem-level maxSteps (when smaller) takes
-// precedence.
-const DEFAULT_STEP_CAP = 2_000_000
+// maxSteps. Catches infinite loops; sized to fit comfortably inside Vercel's
+// 10s Hobby function timeout (~3μs per execNode in this interpreter). Problem
+// -level maxSteps (when smaller) takes precedence.
+const DEFAULT_STEP_CAP = 500_000
 
 let cachedSource: string | null = null
 function loadInterpreterSource(): string {
@@ -139,11 +139,25 @@ async function runCase(code: string, stdin: string, maxSteps: number): Promise<C
 export async function grade(code: string, testCases: TestCase[], maxSteps = 0): Promise<GradeResult> {
   const cases: CaseResult[] = []
   let passedCount = 0
+  let aborted = false
   for (const tc of testCases) {
+    if (aborted) {
+      // Once any test hits the step cap (almost certainly an infinite loop),
+      // remaining tests will too — short-circuit so the request returns
+      // promptly instead of burning the whole platform timeout.
+      cases.push({
+        passed: false,
+        actualStdout: '',
+        stepLimitExceeded: true,
+        error: 'skipped after time limit exceeded',
+      })
+      continue
+    }
     const r = await runCase(code, tc.stdin, maxSteps)
     const passed = !r.error && !r.timedOut && !r.stepLimitExceeded
       && normalize(r.actualStdout) === normalize(tc.expectedStdout)
     if (passed) passedCount++
+    if (r.stepLimitExceeded) aborted = true
     cases.push({ ...r, passed })
   }
   return {
