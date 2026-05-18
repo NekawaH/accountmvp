@@ -544,8 +544,9 @@ export default function WorkspacePage() {
           ta.setSelectionRange(0, ta.value.length)
           document.execCommand('insertText', false, formatCode(code))
         }}
-        className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50"
-        title="Format code"
+        disabled={!!activeFile && !activeFile.name.endsWith('.psc')}
+        className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-white"
+        title={activeFile && !activeFile.name.endsWith('.psc') ? 'Only .psc files can be formatted' : 'Format code'}
       >Format</button>
     </>
   )
