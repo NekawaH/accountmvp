@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { highlightPseudocode } from '@/app/components/PseudocodeHighlight'
 
 interface Example { input: string; output: string }
 interface Problem {
@@ -32,6 +33,7 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<SubmitResult | null>(null)
   const [error, setError] = useState('')
+  const overlayRef = useRef<HTMLPreElement | null>(null)
 
   useEffect(() => {
     fetch(`/api/problems/${params.slug}`)
@@ -172,13 +174,38 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
       </p>
 
       <label className="block text-sm font-medium mb-1">Your pseudocode</label>
-      <textarea
-        value={code}
-        onChange={e => setCode(e.target.value)}
-        onKeyDown={handleKeyDown}
-        spellCheck={false}
-        className="w-full h-64 font-mono text-sm border rounded p-3"
-      />
+      <div className="relative w-full h-64 border rounded overflow-hidden bg-white">
+        <pre
+          ref={overlayRef}
+          aria-hidden="true"
+          className="absolute inset-0 font-mono text-sm p-3 m-0 overflow-auto"
+          style={{
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            overflowWrap: 'break-word',
+            pointerEvents: 'none',
+            lineHeight: '21px',
+            color: '#1f2937',
+            background: 'transparent',
+          }}
+        >
+          {highlightPseudocode(code.endsWith('\n') ? code + ' ' : code)}
+        </pre>
+        <textarea
+          value={code}
+          onChange={e => setCode(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onScroll={e => {
+            if (overlayRef.current) {
+              overlayRef.current.scrollTop = e.currentTarget.scrollTop
+              overlayRef.current.scrollLeft = e.currentTarget.scrollLeft
+            }
+          }}
+          spellCheck={false}
+          className="absolute inset-0 w-full h-full resize-none font-mono text-sm p-3 focus:outline-none bg-transparent"
+          style={{ lineHeight: '21px', color: 'transparent', caretColor: '#1f2937' }}
+        />
+      </div>
 
       <div className="flex items-center gap-3 mt-3">
         <button

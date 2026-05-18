@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
+import { HighlightedPseudocode } from './PseudocodeHighlight'
 
 export const EXAMPLES = [
   {
@@ -402,18 +403,31 @@ export default function WorkspaceShell({
                 >
                   {Array.from({ length: lineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
                 </div>
-                <textarea
-                  ref={inputBoxRef}
-                  id="inputBox"
-                  value={code}
-                  onChange={e => { setCode(e.target.value); onCodeChange?.(e.target.value) }}
-                  onKeyDown={handleKeyDown}
-                  readOnly={readOnly}
-                  spellCheck={false}
-                  placeholder={readOnly ? undefined : 'Enter pseudocode here…'}
-                  className={`flex-1 resize-none font-mono text-sm p-2.5 focus:outline-none ${readOnly ? 'bg-gray-50 text-gray-800 cursor-default' : 'bg-gray-50 text-gray-800'}`}
-                  style={{ lineHeight: '21px', overflow: 'hidden', minHeight: '100%', height: `${lineCount * 21 + 20}px` }}
-                />
+                <div className="flex-1 relative" style={{ minHeight: '100%', height: `${lineCount * 21 + 20}px` }}>
+                  <HighlightedPseudocode
+                    code={code}
+                    className="font-mono text-sm p-2.5"
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      lineHeight: '21px',
+                      color: '#1f2937',
+                      background: 'transparent',
+                    }}
+                  />
+                  <textarea
+                    ref={inputBoxRef}
+                    id="inputBox"
+                    value={code}
+                    onChange={e => { setCode(e.target.value); onCodeChange?.(e.target.value) }}
+                    onKeyDown={handleKeyDown}
+                    readOnly={readOnly}
+                    spellCheck={false}
+                    placeholder={readOnly ? undefined : 'Enter pseudocode here…'}
+                    className={`absolute inset-0 w-full h-full resize-none font-mono text-sm p-2.5 focus:outline-none bg-transparent ${readOnly ? 'cursor-default' : ''}`}
+                    style={{ lineHeight: '21px', overflow: 'hidden', color: 'transparent', caretColor: '#1f2937' }}
+                  />
+                </div>
               </div>
             </div>
 
