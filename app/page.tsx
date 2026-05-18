@@ -140,13 +140,13 @@ export default function DashboardPage() {
             <button
               onClick={() => router.push('/profile')}
               title={profile?.username ?? ''}
-              className="flex items-center gap-2 h-9 px-2 bg-white border border-gray-300 hover:border-gray-400 rounded-lg whitespace-nowrap max-w-[140px]"
+              className="flex items-center gap-2 h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg whitespace-nowrap"
             >
               {profile?.avatarUrl
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={profile.avatarUrl} alt="avatar" className="w-6 h-6 rounded-full object-cover shrink-0" />
                 : <div className="w-6 h-6 rounded-full bg-gray-200 shrink-0" />}
-              <span className="text-sm text-gray-700 font-medium truncate">{profile?.username ?? '…'}</span>
+              <span className="text-sm text-gray-700 font-medium">{profile?.username ?? '…'}</span>
             </button>
           </div>
         </div>
