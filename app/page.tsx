@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [collabWorkspaces, setCollabWorkspaces] = useState<CollabWorkspace[]>([])
+  const [collabLoading, setCollabLoading] = useState(true)
   const [noticeCount, setNoticeCount] = useState(0)
   // Search
   const [searchQ, setSearchQ] = useState('')
@@ -32,7 +33,10 @@ export default function DashboardPage() {
   useEffect(() => {
     fetch('/api/workspaces').then(r => r.ok ? r.json() : []).then(setWorkspaces).finally(() => setLoading(false))
     fetch('/api/profile').then(r => r.ok ? r.json() : null).then(setProfile)
-    fetch('/api/workspaces/collaborations').then(r => r.ok ? r.json() : []).then(setCollabWorkspaces)
+    fetch('/api/workspaces/collaborations')
+      .then(r => r.ok ? r.json() : [])
+      .then(setCollabWorkspaces)
+      .finally(() => setCollabLoading(false))
 
     const loadCount = () =>
       fetch('/api/messages/count').then(r => r.ok ? r.json() : { count: 0 }).then(d => setNoticeCount(d.count)).catch(() => {})
@@ -306,11 +310,26 @@ export default function DashboardPage() {
         )}
 
         {/* Collaborating workspaces */}
-        {collabWorkspaces.length > 0 && (
+        {(collabLoading || collabWorkspaces.length > 0) && (
           <div className="mt-8">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Collaborating</h2>
-            <div className="space-y-2">
-              {collabWorkspaces.map(ws => (
+            {collabLoading ? (
+              <div className="space-y-2">
+                {[0, 1].map(i => (
+                  <div key={i} className="bg-white border border-gray-200 rounded-xl px-5 py-4 shadow-sm flex items-center justify-between animate-pulse">
+                    <div className="min-w-0 flex-1">
+                      <div className="h-4 bg-gray-200 rounded w-1/3 mb-2" />
+                      <div className="h-3 bg-gray-100 rounded w-1/5" />
+                    </div>
+                    <div className="flex items-center flex-shrink-0 ml-3">
+                      <div className="w-7 h-7 rounded-full bg-gray-200 ring-2 ring-yellow-100" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {collabWorkspaces.map(ws => (
                 <div
                   key={ws.id}
                   onClick={() => router.push(`/users/${ws.user.username}/workspace/${ws.id}`)}
@@ -338,7 +357,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
-            </div>
+              </div>
+            )}
           </div>
         )}
       </div>
