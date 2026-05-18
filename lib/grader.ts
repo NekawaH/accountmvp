@@ -18,6 +18,7 @@ export interface CaseResult {
   error?: string
   timedOut?: boolean
   stepLimitExceeded?: boolean
+  stepsUsed?: number
 }
 
 export interface GradeResult {
@@ -124,16 +125,18 @@ async function runCase(code: string, stdin: string, maxSteps: number): Promise<C
   if (timedOut) {
     return { passed: false, actualStdout: output, timedOut: true, error: 'time limit exceeded' }
   }
+  const stepsUsed = pseudoIDE.lastRun?.stepsUsed ?? 0
   const stepLimitExceeded = !!pseudoIDE.lastRun?.stepLimitExceeded
   if (stepLimitExceeded) {
     return {
       passed: false,
       actualStdout: output,
       stepLimitExceeded: true,
+      stepsUsed,
       error: 'time limit exceeded',
     }
   }
-  return { passed: false, actualStdout: output }
+  return { passed: false, actualStdout: output, stepsUsed }
 }
 
 export async function grade(code: string, testCases: TestCase[], maxSteps = 0): Promise<GradeResult> {

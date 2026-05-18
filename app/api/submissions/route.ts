@@ -45,6 +45,7 @@ export async function POST(req: NextRequest) {
       index: i,
       passed: c.passed,
       timedOut: !!c.timedOut || !!c.stepLimitExceeded,
+      stepsUsed: c.stepsUsed ?? null,
       error: c.error ?? null,
       // Do not echo actualStdout — it would reveal the hidden stdin (the
       // interpreter echoes every INPUT value to stdout).
