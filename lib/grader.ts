@@ -29,6 +29,12 @@ export interface GradeResult {
 
 const PER_CASE_TIMEOUT_MS = 1
 
+// Safety cap applied to every submission, even when the problem has no
+// maxSteps. Catches infinite loops; high enough that any realistic correct
+// solution stays under it. Problem-level maxSteps (when smaller) takes
+// precedence.
+const DEFAULT_STEP_CAP = 10_000_000
+
 let cachedSource: string | null = null
 function loadInterpreterSource(): string {
   if (cachedSource) return cachedSource
@@ -95,8 +101,12 @@ async function runCase(code: string, stdin: string, maxSteps: number): Promise<C
   }
 
   pseudoIDE.init(outputEl, inputEl)
-  if (maxSteps > 0 && typeof pseudoIDE.setStepLimit === 'function') {
-    pseudoIDE.setStepLimit(maxSteps)
+  // Always apply a step cap: the problem's value if set, else the global
+  // safety cap. Without this, an infinite loop wedges the request because
+  // microtasks starve the wall-clock timeout.
+  const effectiveCap = maxSteps > 0 ? Math.min(maxSteps, DEFAULT_STEP_CAP) : DEFAULT_STEP_CAP
+  if (typeof pseudoIDE.setStepLimit === 'function') {
+    pseudoIDE.setStepLimit(effectiveCap)
   }
 
   let timedOut = false
