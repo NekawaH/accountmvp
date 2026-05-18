@@ -35,6 +35,8 @@ export default function PublicWorkspacePage() {
   const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null)
   const vfsMirror = useRef<Record<string, string>>({})
   const creatingFileRef = useRef(false)
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false)
+  const pendingLeave = useRef<(() => void) | null>(null)
 
   const load = useCallback(async () => {
     const [wsRes, profileRes, filesRes] = await Promise.all([
@@ -156,6 +158,21 @@ export default function PublicWorkspacePage() {
     else setForking(false)
   }
 
+  function hasDirtyFiles() {
+    if (!canEdit || !activeFile) return false
+    const saved = vfsMirror.current[activeFile.name] ?? ''
+    return code !== saved
+  }
+
+  function safeNavigate(action: () => void) {
+    if (hasDirtyFiles()) {
+      pendingLeave.current = action
+      setShowLeaveWarning(true)
+    } else {
+      action()
+    }
+  }
+
   if (notFound) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="text-center">
@@ -261,7 +278,7 @@ export default function PublicWorkspacePage() {
       </div>
 
       <div className="p-3 border-t border-gray-200">
-        <button onClick={() => router.push('/')} className="block w-full text-xs text-center text-gray-500 hover:text-gray-700">
+        <button onClick={() => safeNavigate(() => router.push('/'))} className="block w-full text-xs text-center text-gray-500 hover:text-gray-700">
           ← Dashboard
         </button>
       </div>
@@ -312,15 +329,37 @@ export default function PublicWorkspacePage() {
   )
 
   return (
-    <WorkspaceShell
-      code={code}
-      setCode={setCode}
-      activeFileName={activeFile?.name ?? null}
-      showPrompts={showPrompts}
-      setShowPrompts={setShowPrompts}
-      readOnly={!canEdit}
-      toolbarExtras={toolbarExtras}
-      sidebar={sidebar}
-    />
+    <>
+      {showLeaveWarning && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center pb-8 pointer-events-none">
+          <div className="bg-white border border-yellow-300 shadow-xl rounded-xl px-5 py-4 flex items-center gap-4 pointer-events-auto">
+            <span className="text-sm text-gray-800">You have unsaved changes. Leave anyway?</span>
+            <button
+              onClick={async () => { await saveFile(); setShowLeaveWarning(false); pendingLeave.current?.() }}
+              disabled={saving}
+              className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-medium"
+            >{saving ? 'Saving…' : 'Save & leave'}</button>
+            <button
+              onClick={() => { setShowLeaveWarning(false); pendingLeave.current?.() }}
+              className="text-xs px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium"
+            >Discard & leave</button>
+            <button
+              onClick={() => { setShowLeaveWarning(false); pendingLeave.current = null }}
+              className="text-xs text-gray-400 hover:text-gray-600"
+            >Stay</button>
+          </div>
+        </div>
+      )}
+      <WorkspaceShell
+        code={code}
+        setCode={setCode}
+        activeFileName={activeFile?.name ?? null}
+        showPrompts={showPrompts}
+        setShowPrompts={setShowPrompts}
+        readOnly={!canEdit}
+        toolbarExtras={toolbarExtras}
+        sidebar={sidebar}
+      />
+    </>
   )
 }
