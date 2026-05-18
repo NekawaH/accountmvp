@@ -242,13 +242,6 @@ export default function WorkspaceShell({
   }
 
   async function runCode() {
-    if (activeFileName && !activeFileName.endsWith('.psc')) {
-      if (terminalRef.current) {
-        terminalRef.current.value += (terminalRef.current.value ? '\n' : '') +
-          `Error: only .psc files can be executed (current file: ${activeFileName}).`
-      }
-      return
-    }
     initInterpreter()
     const w = window as any
     if (!w.pseudoIDE) {
@@ -394,9 +387,17 @@ export default function WorkspaceShell({
               ? <button onClick={terminateProgram}
                   className="text-xs px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded font-semibold"
                 >■ Stop</button>
-              : <button onClick={runCode}
-                  className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded font-semibold"
-                >▶ Run</button>
+              : (() => {
+                  const runnable = !activeFileName || activeFileName.endsWith('.psc')
+                  return (
+                    <button
+                      onClick={runCode}
+                      disabled={!runnable}
+                      title={runnable ? undefined : 'Only .psc files can be executed'}
+                      className={`text-xs px-3 py-1 rounded font-semibold text-white ${runnable ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-300 cursor-not-allowed'}`}
+                    >▶ Run</button>
+                  )
+                })()
             }
           </div>
 
