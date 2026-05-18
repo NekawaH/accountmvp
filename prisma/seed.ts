@@ -36,7 +36,7 @@ const problems: SeedProblem[] = [
     title: 'Sum of two numbers',
     statement:
       'Read two integers A and B (one per line). Output A + B.\n\n' +
-      'Example:\n  Input:  3\\n4\n  Output: 7',
+      'Example:\n  Input:  3\n          4\n  Output: 7',
     difficulty: 1,
     testCases: [
       { stdin: '3\n4\n',     expectedStdout: '3\n4\n7\n' },

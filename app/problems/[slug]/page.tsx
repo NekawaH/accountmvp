@@ -81,7 +81,7 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
       </pre>
 
       <p className="text-xs text-gray-500 mb-4">
-        {problem.testCount} hidden test{problem.testCount === 1 ? '' : 's'} — inputs are not shown.
+        {problem.testCount} test case{problem.testCount === 1 ? '' : 's'}
       </p>
 
       <label className="block text-sm font-medium mb-1">Your pseudocode</label>
