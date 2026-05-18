@@ -32,6 +32,7 @@ model Problem {
   difficulty  Int          @default(1)
   testCases   Json
   examples    Json         @default("[]")
+  maxSteps    Int?
   createdAt   DateTime     @default(now())
   submissions Submission[]
 }

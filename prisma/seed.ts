@@ -16,6 +16,7 @@ interface SeedProblem {
   difficulty: number
   examples: { input: string; output: string }[]
   testCases: { stdin: string; expectedStdout: string }[]
+  maxSteps?: number
 }
 
 // Build a worst-case test for binary search: sorted distinct array [1..N],
@@ -134,10 +135,14 @@ const problems: SeedProblem[] = [
       'then a target value X.\n' +
       'Output the 1-based index of X in the list, or -1 if X is not present.\n' +
       '\n' +
-      'You MUST implement binary search — the largest test has N ≈ 50,000 and ' +
-      'the target placed at the worst-case position, so an O(N) linear scan ' +
-      'will time out.',
+      'You MUST implement binary search. There is a step limit on each test ' +
+      'case — an O(N) linear scan over the large stress test will exceed it ' +
+      'and be reported as "time limit exceeded".',
     difficulty: 3,
+    // Step cap: a correct O(log N) solution on the 10 000-element stress test
+    // executes well under 60 000 execNode calls (dominated by the input read
+    // loop). A linear scan adds ~N more, blowing past the cap.
+    maxSteps: 80_000,
     examples: [{ input: '5\n1\n3\n5\n7\n9\n5', output: '3' }],
     testCases: [
       { stdin: '5\n1\n3\n5\n7\n9\n5\n',  expectedStdout: '5\n1\n3\n5\n7\n9\n5\n3\n' },
@@ -145,8 +150,8 @@ const problems: SeedProblem[] = [
       { stdin: '4\n2\n4\n6\n8\n2\n',     expectedStdout: '4\n2\n4\n6\n8\n2\n1\n' },
       { stdin: '4\n2\n4\n6\n8\n8\n',     expectedStdout: '4\n2\n4\n6\n8\n8\n4\n' },
       { stdin: '1\n10\n10\n',            expectedStdout: '1\n10\n10\n1\n' },
-      // Stress test: linear search needs ~50,000 comparisons → TLE.
-      binarySearchStressCase(50000, 50000),
+      // Stress test: linear search blows the step cap; binary search clears it.
+      binarySearchStressCase(10_000, 10_000),
     ],
   },
   {
@@ -198,6 +203,7 @@ async function main() {
         difficulty: p.difficulty,
         examples: p.examples as any,
         testCases: p.testCases as any,
+        maxSteps: p.maxSteps ?? null,
       },
       create: {
         slug: p.slug,
@@ -206,6 +212,7 @@ async function main() {
         difficulty: p.difficulty,
         examples: p.examples as any,
         testCases: p.testCases as any,
+        maxSteps: p.maxSteps ?? null,
       },
     })
     console.log('seeded:', p.slug)

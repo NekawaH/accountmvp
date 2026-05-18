@@ -19,12 +19,12 @@ export async function POST(req: NextRequest) {
 
   const problem = await prisma.problem.findUnique({
     where: { slug: body.slug },
-    select: { id: true, testCases: true },
+    select: { id: true, testCases: true, maxSteps: true },
   })
   if (!problem) return NextResponse.json({ error: 'Problem not found' }, { status: 404 })
 
   const testCases = problem.testCases as unknown as TestCase[]
-  const result = await grade(body.code, testCases)
+  const result = await grade(body.code, testCases, problem.maxSteps ?? 0)
 
   await prisma.submission.create({
     data: {
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     cases: result.cases.map((c, i) => ({
       index: i,
       passed: c.passed,
-      timedOut: !!c.timedOut,
+      timedOut: !!c.timedOut || !!c.stepLimitExceeded,
       error: c.error ?? null,
       // Do not echo actualStdout — it would reveal the hidden stdin (the
       // interpreter echoes every INPUT value to stdout).

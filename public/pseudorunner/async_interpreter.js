@@ -6,6 +6,14 @@
     let consoleInputEl = null;
     let awaitingInputResolver = null;
 
+    // Step counter for grader-mode execution. When stepLimit is 0 the counter
+    // is disabled entirely (the normal workspace path) so nothing is counted
+    // or thrown. The grader calls pseudoIDE.setStepLimit(N) before each run
+    // and reads pseudoIDE.lastRun afterward.
+    let stepCount = 0;
+    let stepLimit = 0;
+    const STEP_LIMIT_ERROR = '__STEP_LIMIT_EXCEEDED__';
+
     function appendConsole(text) {
         if (!consoleEl) return;
         consoleEl.textContent += text;
@@ -1029,6 +1037,10 @@
 
         async function execNode(node, localBindings = {}, instance = null) {
             if (!node) return null;
+            if (stepLimit > 0) {
+                stepCount++;
+                if (stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
+            }
             switch (node.type) {
                 case 'noop':
                     return null;
@@ -1295,16 +1307,34 @@
             });
         },
 
+        // Grader hook: 0 (default) disables counting entirely so normal
+        // workspace runs are unaffected. Any positive value caps execNode
+        // invocations.
+        setStepLimit(n) { stepLimit = n | 0; },
+
+        // Populated after each run() so the server-side grader can tell a
+        // step-limit error apart from regular runtime errors.
+        lastRun: { stepLimitExceeded: false, stepsUsed: 0, error: null },
+
         async run(source, vfs) {
             if (vfs) window.vfs = vfs;
             if (!window.vfs) window.vfs = {};
+            stepCount = 0;
+            this.lastRun = { stepLimitExceeded: false, stepsUsed: 0, error: null };
             try {
                 const parsed = parse(source);
                 const ex = createExecutor(parsed.definitions);
                 await ex.execProgram(parsed.program);
             } catch (e) {
-                appendConsole('Error: ' + e.message);
+                if (e && e.message === STEP_LIMIT_ERROR) {
+                    this.lastRun.stepLimitExceeded = true;
+                    appendConsole('Error: time limit exceeded');
+                } else {
+                    this.lastRun.error = e && e.message;
+                    appendConsole('Error: ' + (e && e.message));
+                }
             }
+            this.lastRun.stepsUsed = stepCount;
             return window.vfs;
         }
     };

@@ -17,6 +17,7 @@ export interface CaseResult {
   actualStdout: string
   error?: string
   timedOut?: boolean
+  stepLimitExceeded?: boolean
 }
 
 export interface GradeResult {
@@ -45,7 +46,7 @@ function normalize(s: string): string {
     .replace(/\n+$/, '')
 }
 
-async function runCase(code: string, stdin: string): Promise<CaseResult> {
+async function runCase(code: string, stdin: string, maxSteps: number): Promise<CaseResult> {
   const sandbox: any = {
     console, setTimeout, clearTimeout, setImmediate, clearImmediate,
     Promise, queueMicrotask,
@@ -94,6 +95,9 @@ async function runCase(code: string, stdin: string): Promise<CaseResult> {
   }
 
   pseudoIDE.init(outputEl, inputEl)
+  if (maxSteps > 0 && typeof pseudoIDE.setStepLimit === 'function') {
+    pseudoIDE.setStepLimit(maxSteps)
+  }
 
   let timedOut = false
   const runPromise = (pseudoIDE.run(code, null) as Promise<any>).catch((e: any) => {
@@ -107,15 +111,25 @@ async function runCase(code: string, stdin: string): Promise<CaseResult> {
   if (timedOut) {
     return { passed: false, actualStdout: output, timedOut: true, error: 'time limit exceeded' }
   }
+  const stepLimitExceeded = !!pseudoIDE.lastRun?.stepLimitExceeded
+  if (stepLimitExceeded) {
+    return {
+      passed: false,
+      actualStdout: output,
+      stepLimitExceeded: true,
+      error: 'time limit exceeded',
+    }
+  }
   return { passed: false, actualStdout: output }
 }
 
-export async function grade(code: string, testCases: TestCase[]): Promise<GradeResult> {
+export async function grade(code: string, testCases: TestCase[], maxSteps = 0): Promise<GradeResult> {
   const cases: CaseResult[] = []
   let passedCount = 0
   for (const tc of testCases) {
-    const r = await runCase(code, tc.stdin)
-    const passed = !r.error && !r.timedOut && normalize(r.actualStdout) === normalize(tc.expectedStdout)
+    const r = await runCase(code, tc.stdin, maxSteps)
+    const passed = !r.error && !r.timedOut && !r.stepLimitExceeded
+      && normalize(r.actualStdout) === normalize(tc.expectedStdout)
     if (passed) passedCount++
     cases.push({ ...r, passed })
   }
