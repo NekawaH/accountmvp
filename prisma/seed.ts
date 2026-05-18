@@ -140,9 +140,10 @@ const problems: SeedProblem[] = [
       'and be reported as "time limit exceeded".',
     difficulty: 3,
     // Step cap: a correct O(log N) solution on the 10 000-element stress test
-    // executes well under 60 000 execNode calls (dominated by the input read
-    // loop). A linear scan adds ~N more, blowing past the cap.
-    maxSteps: 80_000,
+    // executes ~30–35k execNode calls (dominated by the input read loop, plus
+    // ~14 binary-search iterations). A linear scan adds another ~30k for the
+    // scan body, pushing total above the cap.
+    maxSteps: 45_000,
     examples: [{ input: '5\n1\n3\n5\n7\n9\n5', output: '3' }],
     testCases: [
       { stdin: '5\n1\n3\n5\n7\n9\n5\n',  expectedStdout: '5\n1\n3\n5\n7\n9\n5\n3\n' },
