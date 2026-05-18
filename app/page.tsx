@@ -112,6 +112,18 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-gray-900">Workspaces</h1>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => router.push('/problems')}
+              className="h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-gray-700 whitespace-nowrap"
+            >
+              Problems
+            </button>
+            <button
+              onClick={() => router.push('/leaderboard')}
+              className="h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-gray-700 whitespace-nowrap"
+            >
+              Leaderboard
+            </button>
+            <button
               onClick={() => router.push('/notices')}
               className="relative flex items-center gap-1.5 h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-gray-700 whitespace-nowrap"
             >

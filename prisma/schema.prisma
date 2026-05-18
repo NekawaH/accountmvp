@@ -21,6 +21,34 @@ model User {
   invitationsSent     WorkspaceInvitation[]   @relation("InvitationsSent")
   invitationsReceived WorkspaceInvitation[]   @relation("InvitationsReceived")
   collaborations      WorkspaceCollaborator[]
+  submissions         Submission[]
+}
+
+model Problem {
+  id          String       @id @default(cuid())
+  slug        String       @unique
+  title       String
+  statement   String
+  difficulty  Int          @default(1)
+  testCases   Json
+  createdAt   DateTime     @default(now())
+  submissions Submission[]
+}
+
+model Submission {
+  id          String   @id @default(cuid())
+  userId      String
+  problemId   String
+  code        String
+  passed      Boolean
+  testsPassed Int
+  testsTotal  Int
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem     Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  @@index([userId, problemId])
+  @@index([problemId, passed])
 }
 
 model Workspace {

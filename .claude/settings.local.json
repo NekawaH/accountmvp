@@ -14,7 +14,8 @@
       "Bash(cp /Users/alt/Documents/Pseudorunner/list.js /Users/alt/Documents/accountmvp/public/pseudorunner/list.js)",
       "Bash(sed -n '169,1419p' /Users/alt/Documents/accountmvp/interpreter_client/interpreter.js)",
       "Read(//tmp/**)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(wc -l /Users/alt/Documents/accountmvp/public/pseudorunner/*.js)"
     ]
   }
 }
