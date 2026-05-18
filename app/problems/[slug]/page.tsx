@@ -90,7 +90,6 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
         onChange={e => setCode(e.target.value)}
         spellCheck={false}
         className="w-full h-64 font-mono text-sm border rounded p-3"
-        placeholder={'INPUT N\nOUTPUT N'}
       />
 
       <div className="flex items-center gap-3 mt-3">

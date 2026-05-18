@@ -108,21 +108,22 @@ export default function DashboardPage() {
       <div className="w-full max-w-2xl">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Workspaces</h1>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => router.push('/problems')}
-              className="h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-gray-700 whitespace-nowrap"
-            >
-              Problems
-            </button>
-            <button
-              onClick={() => router.push('/leaderboard')}
-              className="h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-gray-700 whitespace-nowrap"
-            >
-              Leaderboard
-            </button>
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div className="flex items-baseline gap-4">
+            <h1 className="text-2xl font-bold text-gray-900">Workspaces</h1>
+            <nav className="flex items-center gap-3 text-sm">
+              <button
+                onClick={() => router.push('/problems')}
+                className="text-gray-600 hover:text-gray-900 hover:underline"
+              >Problems</button>
+              <span className="text-gray-300">·</span>
+              <button
+                onClick={() => router.push('/leaderboard')}
+                className="text-gray-600 hover:text-gray-900 hover:underline"
+              >Leaderboard</button>
+            </nav>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => router.push('/notices')}
               className="relative flex items-center gap-1.5 h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg text-sm text-gray-700 whitespace-nowrap"
@@ -138,16 +139,17 @@ export default function DashboardPage() {
             >+ New workspace</button>
             <button
               onClick={() => router.push('/profile')}
-              className="flex items-center gap-2 h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 rounded-lg whitespace-nowrap"
+              title={profile?.username ?? ''}
+              className="flex items-center gap-2 h-9 px-2 bg-white border border-gray-300 hover:border-gray-400 rounded-lg whitespace-nowrap max-w-[140px]"
             >
               {profile?.avatarUrl
                 // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={profile.avatarUrl} alt="avatar" className="w-6 h-6 rounded-full object-cover" />
-                : <div className="w-6 h-6 rounded-full bg-gray-200" />}
-              <span className="text-sm text-gray-700 font-medium">{profile?.username ?? '…'}</span>
+                ? <img src={profile.avatarUrl} alt="avatar" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                : <div className="w-6 h-6 rounded-full bg-gray-200 shrink-0" />}
+              <span className="text-sm text-gray-700 font-medium truncate">{profile?.username ?? '…'}</span>
             </button>
             <form action="/api/auth/logout" method="POST">
-              <button type="submit" className="h-9 px-4 bg-white border border-gray-300 hover:border-gray-400 text-sm font-medium text-gray-700 rounded-lg whitespace-nowrap">Sign out</button>
+              <button type="submit" className="h-9 px-3 bg-white border border-gray-300 hover:border-gray-400 text-sm font-medium text-gray-700 rounded-lg whitespace-nowrap">Sign out</button>
             </form>
           </div>
         </div>
