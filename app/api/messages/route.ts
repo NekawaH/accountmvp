@@ -27,7 +27,7 @@ export async function GET() {
 
   // Mark unseen items as seen now that the user is viewing them
   const unseenFromIds = sent.filter(i => !i.seenByFrom).map(i => i.id)
-  const unseenToIds = received.filter(i => i.status === 'REMOVED' && !i.seenByTo).map(i => i.id)
+  const unseenToIds = received.filter(i => (i.status === 'REMOVED' || i.status === 'LEFT') && !i.seenByTo).map(i => i.id)
 
   await Promise.all([
     unseenFromIds.length > 0 && prisma.workspaceInvitation.updateMany({

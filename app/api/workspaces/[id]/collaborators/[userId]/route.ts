@@ -10,23 +10,41 @@ export async function DELETE(
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const ws = await prisma.workspace.findUnique({ where: { id: params.id } })
-  if (!ws || ws.userId !== session.userId) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const isOwner = ws.userId === session.userId
+  const isSelf = params.userId === session.userId
+  if (!isOwner && !isSelf) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   await prisma.workspaceCollaborator.delete({
     where: { workspaceId_userId: { workspaceId: params.id, userId: params.userId } },
   })
 
-  await prisma.workspaceInvitation.create({
-    data: {
-      workspaceId: params.id,
-      fromUserId: session.userId,
-      toUserId: params.userId,
-      status: 'REMOVED',
-      seenByFrom: true,
-    },
-  })
+  if (isSelf && !isOwner) {
+    // Collaborator left voluntarily — notify the owner.
+    await prisma.workspaceInvitation.create({
+      data: {
+        workspaceId: params.id,
+        fromUserId: session.userId,
+        toUserId: ws.userId,
+        status: 'LEFT',
+        seenByFrom: true,
+      },
+    })
+  } else {
+    // Owner removed the collaborator — notify the removed user.
+    await prisma.workspaceInvitation.create({
+      data: {
+        workspaceId: params.id,
+        fromUserId: session.userId,
+        toUserId: params.userId,
+        status: 'REMOVED',
+        seenByFrom: true,
+      },
+    })
+  }
 
   return NextResponse.json({ ok: true })
 }

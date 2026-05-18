@@ -91,7 +91,7 @@ export default function NoticesPage() {
               <div className="space-y-3">
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Invitations</h2>
                 {received.map(inv => (
-                  <div key={inv.id} className={`bg-white border rounded-xl px-5 py-4 shadow-sm flex items-center gap-4 ${inv.status === 'REMOVED' && !inv.seenByTo ? 'border-blue-300' : 'border-gray-200'}`}>
+                  <div key={inv.id} className={`bg-white border rounded-xl px-5 py-4 shadow-sm flex items-center gap-4 ${(inv.status === 'REMOVED' || inv.status === 'LEFT') && !inv.seenByTo ? 'border-blue-300' : 'border-gray-200'}`}>
                     {inv.from.avatarUrl
                       // eslint-disable-next-line @next/next/no-img-element
                       ? <img src={inv.from.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover flex-shrink-0" />
@@ -102,12 +102,14 @@ export default function NoticesPage() {
                           <span className="font-semibold">{inv.from.username}</span>
                           {inv.status === 'REMOVED'
                             ? <>{' '}removed you from <span className="font-semibold">{inv.workspace.name}</span></>
-                            : <>{' '}invited you to collaborate on <span className="font-semibold">{inv.workspace.name}</span></>
+                            : inv.status === 'LEFT'
+                              ? <>{' '}left your workspace <span className="font-semibold">{inv.workspace.name}</span></>
+                              : <>{' '}invited you to collaborate on <span className="font-semibold">{inv.workspace.name}</span></>
                           }
                         </p>
                         <p className="text-xs text-gray-400 mt-0.5">{new Date(inv.createdAt).toLocaleDateString()}</p>
                       </div>
-                      {inv.status === 'REMOVED' && !inv.seenByTo && (
+                      {(inv.status === 'REMOVED' || inv.status === 'LEFT') && !inv.seenByTo && (
                         <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
                       )}
                     </div>
@@ -128,9 +130,10 @@ export default function NoticesPage() {
                       <span className={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${
                         inv.status === 'ACCEPTED' ? 'bg-green-100 text-green-700' :
                         inv.status === 'REMOVED' ? 'bg-red-100 text-red-600' :
+                        inv.status === 'LEFT' ? 'bg-orange-100 text-orange-600' :
                         'bg-gray-100 text-gray-500'
                       }`}>
-                        {inv.status === 'ACCEPTED' ? 'Accepted' : inv.status === 'REMOVED' ? 'Removed' : 'Declined'}
+                        {inv.status === 'ACCEPTED' ? 'Accepted' : inv.status === 'REMOVED' ? 'Removed' : inv.status === 'LEFT' ? 'Left' : 'Declined'}
                       </span>
                     )}
                   </div>

@@ -29,6 +29,9 @@ export default function PublicWorkspacePage() {
   const [showPrompts, setShowPrompts] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [isCollaborator, setIsCollaborator] = useState(false)
+  const [myUserId, setMyUserId] = useState<string | null>(null)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [leaving, setLeaving] = useState(false)
   const [showExamples, setShowExamples] = useState(false)
   const [showNewFile, setShowNewFile] = useState(false)
   const [newFileName, setNewFileName] = useState('')
@@ -56,7 +59,9 @@ export default function PublicWorkspacePage() {
         router.replace(`/workspace/${workspaceId}`)
         return
       }
-      setIsCollaborator(wsData.collaborators?.some(c => c.user.username === me.username) ?? false)
+      const meCollab = wsData.collaborators?.find(c => c.user.username === me.username)
+      setIsCollaborator(!!meCollab)
+      setMyUserId(meCollab?.userId ?? null)
     }
 
     const entries: LoadedFile[] = await filesRes.json()
@@ -156,6 +161,14 @@ export default function PublicWorkspacePage() {
     const res = await fetch(`/api/workspaces/${workspaceId}/fork`, { method: 'POST' })
     if (res.ok) { const { id } = await res.json(); router.push(`/workspace/${id}`) }
     else setForking(false)
+  }
+
+  async function leaveWorkspace() {
+    if (!myUserId) return
+    setLeaving(true)
+    const res = await fetch(`/api/workspaces/${workspaceId}/collaborators/${myUserId}`, { method: 'DELETE' })
+    if (res.ok) router.push('/')
+    else setLeaving(false)
   }
 
   function hasDirtyFiles() {
@@ -290,7 +303,29 @@ export default function PublicWorkspacePage() {
         ))}
       </div>
 
-      <div className="p-3 border-t border-gray-200">
+      <div className="p-3 border-t border-gray-200 space-y-1.5">
+        {isCollaborator && (
+          confirmLeave ? (
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-600 truncate flex-1">Leave this workspace?</span>
+              <button
+                onClick={() => safeNavigate(leaveWorkspace)}
+                disabled={leaving}
+                className="text-xs px-1.5 py-0.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded font-medium flex-shrink-0"
+              >{leaving ? '…' : 'Yes'}</button>
+              <button
+                onClick={() => setConfirmLeave(false)}
+                disabled={leaving}
+                className="text-xs px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded font-medium flex-shrink-0"
+              >No</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmLeave(true)}
+              className="block w-full text-xs text-center text-red-500 hover:text-red-700"
+            >Leave workspace</button>
+          )
+        )}
         <button onClick={() => safeNavigate(() => router.push('/'))} className="block w-full text-xs text-center text-gray-500 hover:text-gray-700">
           ← Dashboard
         </button>
