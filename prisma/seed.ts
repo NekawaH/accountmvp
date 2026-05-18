@@ -1,6 +1,5 @@
 // Seeds initial autograder problems.
-// Run with: npx ts-node --transpile-only prisma/seed.ts
-// (or: npx tsx prisma/seed.ts)
+// Run with: npx tsx prisma/seed.ts
 //
 // IMPORTANT about expected outputs: the pseudocode interpreter echoes each
 // INPUT value to stdout (followed by a newline) AND each OUTPUT statement
@@ -15,6 +14,7 @@ interface SeedProblem {
   title: string
   statement: string
   difficulty: number
+  examples: { input: string; output: string }[]
   testCases: { stdin: string; expectedStdout: string }[]
 }
 
@@ -22,10 +22,9 @@ const problems: SeedProblem[] = [
   {
     slug: 'hello-name',
     title: 'Hello, name',
-    statement:
-      'Read a name from input and output: Hello, <name>\n\n' +
-      'Example:\n  Input:  Alice\n  Output: Hello, Alice',
+    statement: 'Read a name from input and output: Hello, <name>',
     difficulty: 1,
+    examples: [{ input: 'Alice', output: 'Hello, Alice' }],
     testCases: [
       { stdin: 'Alice\n', expectedStdout: 'Alice\nHello, Alice\n' },
       { stdin: 'Bob\n',   expectedStdout: 'Bob\nHello, Bob\n' },
@@ -34,10 +33,9 @@ const problems: SeedProblem[] = [
   {
     slug: 'sum-two',
     title: 'Sum of two numbers',
-    statement:
-      'Read two integers A and B (one per line). Output A + B.\n\n' +
-      'Example:\n  Input:  3\n          4\n  Output: 7',
+    statement: 'Read two integers A and B (one per line). Output A + B.',
     difficulty: 1,
+    examples: [{ input: '3\n4', output: '7' }],
     testCases: [
       { stdin: '3\n4\n',     expectedStdout: '3\n4\n7\n' },
       { stdin: '10\n-3\n',   expectedStdout: '10\n-3\n7\n' },
@@ -47,10 +45,9 @@ const problems: SeedProblem[] = [
   {
     slug: 'sum-to-n',
     title: 'Sum from 1 to N',
-    statement:
-      'Read a positive integer N. Output the sum 1 + 2 + ... + N.\n\n' +
-      'Example:\n  Input:  5\n  Output: 15',
+    statement: 'Read a positive integer N. Output the sum 1 + 2 + ... + N.',
     difficulty: 2,
+    examples: [{ input: '5', output: '15' }],
     testCases: [
       { stdin: '1\n',   expectedStdout: '1\n1\n' },
       { stdin: '5\n',   expectedStdout: '5\n15\n' },
@@ -69,6 +66,7 @@ const problems: SeedProblem[] = [
       '  - i otherwise\n' +
       'One value per line.',
     difficulty: 3,
+    examples: [{ input: '5', output: '1\n2\nFizz\n4\nBuzz' }],
     testCases: [
       {
         stdin: '5\n',
@@ -91,6 +89,7 @@ async function main() {
         title: p.title,
         statement: p.statement,
         difficulty: p.difficulty,
+        examples: p.examples as any,
         testCases: p.testCases as any,
       },
       create: {
@@ -98,6 +97,7 @@ async function main() {
         title: p.title,
         statement: p.statement,
         difficulty: p.difficulty,
+        examples: p.examples as any,
         testCases: p.testCases as any,
       },
     })

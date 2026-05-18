@@ -3,12 +3,14 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
+interface Example { input: string; output: string }
 interface Problem {
   id: string
   slug: string
   title: string
   statement: string
   difficulty: number
+  examples: Example[]
   testCount: number
 }
 interface CaseResult {
@@ -79,6 +81,28 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
       <pre className="whitespace-pre-wrap text-sm bg-gray-50 border rounded p-3 mb-4">
         {problem.statement}
       </pre>
+
+      {problem.examples.length > 0 && (
+        <div className="mb-4 space-y-3">
+          {problem.examples.map((ex, i) => (
+            <div key={i}>
+              <div className="text-xs font-medium text-gray-600 mb-1">
+                Example {problem.examples.length > 1 ? i + 1 : ''}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Input</div>
+                  <pre className="font-mono text-sm bg-gray-50 border rounded p-2 whitespace-pre-wrap">{ex.input}</pre>
+                </div>
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">Output</div>
+                  <pre className="font-mono text-sm bg-gray-50 border rounded p-2 whitespace-pre-wrap">{ex.output}</pre>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <p className="text-xs text-gray-500 mb-4">
         {problem.testCount} test case{problem.testCount === 1 ? '' : 's'}

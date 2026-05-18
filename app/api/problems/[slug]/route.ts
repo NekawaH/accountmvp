@@ -9,7 +9,7 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
     where: { slug: params.slug },
     select: {
       id: true, slug: true, title: true, statement: true, difficulty: true,
-      testCases: true, createdAt: true,
+      testCases: true, examples: true, createdAt: true,
     },
   })
   if (!problem) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -23,6 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
     title: problem.title,
     statement: problem.statement,
     difficulty: problem.difficulty,
+    examples: problem.examples ?? [],
     testCount,
   })
 }
