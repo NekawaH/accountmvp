@@ -15,7 +15,9 @@
       "Bash(sed -n '169,1419p' /Users/alt/Documents/accountmvp/interpreter_client/interpreter.js)",
       "Read(//tmp/**)",
       "Bash(curl:*)",
-      "Bash(wc -l /Users/alt/Documents/accountmvp/public/pseudorunner/*.js)"
+      "Bash(wc -l /Users/alt/Documents/accountmvp/public/pseudorunner/*.js)",
+      "Bash(timeout 4 npx tsx --env-file=.env server/yws.ts)",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }

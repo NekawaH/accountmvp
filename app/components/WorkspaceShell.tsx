@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Script from 'next/script'
 import { HighlightedPseudocode } from './PseudocodeHighlight'
+import { useYjsTextarea, Peer } from './useYjsTextarea'
 
 export const EXAMPLES = [
   {
@@ -111,6 +112,12 @@ interface Props {
   onBeforeRun?: () => Promise<void>
   /** Called after the interpreter finishes; receives vfs snapshots for file-change sync */
   onAfterRun?: (vfsBefore: Record<string, string>, vfsAfter: Record<string, string>) => Promise<void>
+  /** When set, the editor joins a Yjs room for this file and live-syncs
+   *  with other connected collaborators. Pair with `currentUser`. */
+  realtimeFileId?: string | null
+  currentUser?: { username: string; avatarUrl: string | null } | null
+  /** Optional callback receiving the live peer list (for sidebar UI). */
+  onPeersChange?: (peers: Peer[]) => void
 }
 
 export function formatCode(src: string): string {
@@ -185,6 +192,9 @@ export default function WorkspaceShell({
   sidebar,
   onBeforeRun,
   onAfterRun,
+  realtimeFileId = null,
+  currentUser = null,
+  onPeersChange,
 }: Props) {
   const [running, setRunning] = useState(false)
   const [consoleWidth, setConsoleWidth] = useState(320)
@@ -199,6 +209,20 @@ export default function WorkspaceShell({
   const runningRef = useRef(false)
 
   const lineCount = code.split('\n').length
+
+  // Realtime co-edit: when realtimeFileId is set, bind the textarea to a
+  // Yjs room. The hook listens to `input` events in parallel with the
+  // existing React onChange/onKeyDown handlers — local typing still
+  // flows through setCode normally, and remote updates arrive via
+  // applyRemoteString which preserves the local caret.
+  const { peers } = useYjsTextarea({
+    fileId: realtimeFileId,
+    textareaRef: inputBoxRef,
+    initialContent: code,
+    onChange: next => { setCode(next); onCodeChange?.(next) },
+    user: currentUser,
+  })
+  useEffect(() => { onPeersChange?.(peers) }, [peers, onPeersChange])
 
   useEffect(() => {
     document.documentElement.style.overflow = 'hidden'

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import WorkspaceShell, { formatCode, EXAMPLES } from '../../components/WorkspaceShell'
 import FileHistoryDrawer from '../../components/FileHistoryDrawer'
+import { Peer } from '../../components/useYjsTextarea'
 
 interface PseudoFile {
   id: string
@@ -53,6 +54,8 @@ export default function WorkspacePage() {
   const vfsMirror = useRef<Record<string, string>>({})
   const creatingFileRef = useRef(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ username: string; avatarUrl: string | null } | null>(null)
+  const [peers, setPeers] = useState<Peer[]>([])
 
   const loadFileList = useCallback(async () => {
     const res = await fetch(`/api/files?workspaceId=${workspaceId}&withContent=true`)
@@ -90,6 +93,9 @@ export default function WorkspacePage() {
     fetch(`/api/workspaces/${workspaceId}`)
       .then(r => r.ok ? r.json() : null)
       .then(ws => { if (ws) { setWorkspaceName(ws.name); setCollaborators(ws.collaborators ?? []) } })
+    fetch('/api/profile')
+      .then(r => r.ok ? r.json() : null)
+      .then(u => { if (u) setCurrentUser({ username: u.username, avatarUrl: u.avatarUrl || null }) })
     loadFileList()
   }, [workspaceId, loadFileList])
 
@@ -517,7 +523,9 @@ export default function WorkspacePage() {
         )}
         {collaborators.length > 0 && (
           <div className="space-y-1 pt-1">
-            {collaborators.map(c => (
+            {collaborators.map(c => {
+              const isLive = peers.some(p => p.username === c.user.username)
+              return (
               <div key={c.userId} className="flex items-center gap-1.5 group">
                 {confirmRemoveUserId === c.userId ? (
                   <>
@@ -533,10 +541,13 @@ export default function WorkspacePage() {
                   </>
                 ) : (
                   <>
-                    {c.user.avatarUrl
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={c.user.avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover flex-shrink-0" />
-                      : <div className="w-4 h-4 rounded-full bg-gray-200 flex-shrink-0" />}
+                    <span className="relative flex-shrink-0">
+                      {c.user.avatarUrl
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={c.user.avatarUrl} alt="" className="w-4 h-4 rounded-full object-cover" />
+                        : <div className="w-4 h-4 rounded-full bg-gray-200" />}
+                      {isLive && <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-green-500 ring-1 ring-white" title="Live" />}
+                    </span>
                     <span className="text-xs text-gray-600 truncate flex-1">{c.user.username}</span>
                     <button
                       onClick={() => setConfirmRemoveUserId(c.userId)}
@@ -546,7 +557,7 @@ export default function WorkspacePage() {
                   </>
                 )}
               </div>
-            ))}
+            )})}
           </div>
         )}
         <button
@@ -643,6 +654,9 @@ export default function WorkspacePage() {
         onBeforeRun={onBeforeRun}
         onAfterRun={onAfterRun}
         sidebar={sidebar}
+        realtimeFileId={activeFile?.id ?? null}
+        currentUser={currentUser}
+        onPeersChange={setPeers}
       />
 
       {showHistory && activeFile && (

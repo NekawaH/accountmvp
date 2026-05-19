@@ -36,6 +36,26 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000)
 
+### 5. Run the realtime co-edit server (optional)
+
+The workspace editor live-syncs collaborators through a Yjs WebSocket server. Start it in a second terminal:
+
+```bash
+npm run dev:ws        # tsx server/yws.ts, listens on ws://localhost:1234
+```
+
+Or run both Next.js and the WS server together:
+
+```bash
+npm run dev:all
+```
+
+Env vars (optional, defaults shown):
+- `WS_PORT=1234` — server-side
+- `NEXT_PUBLIC_YWS_URL=ws://localhost:1234` — client-side
+
+The WS server reuses `JWT_SECRET` from `.env` to verify short-lived tokens issued by `/api/realtime/token`. If `dev:ws` is not running, the editor still works in single-user mode (saves through the REST API).
+
 ---
 
 ## Deploy to Vercel

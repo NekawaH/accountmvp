@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:ws": "tsx --env-file=.env server/yws.ts",
+    "dev:all": "concurrently -k -n next,ws -c blue,magenta \"npm:dev\" \"npm:dev:ws\"",
     "build": "prisma generate && prisma migrate deploy && next build",
     "start": "next start",
     "db:push": "prisma db push",
@@ -18,17 +20,24 @@
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "resend": "^3.2.0"
+    "resend": "^3.2.0",
+    "ws": "^8.20.1",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.30"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/ws": "^8.18.1",
     "autoprefixer": "^10.4.19",
+    "concurrently": "^9.2.1",
     "postcss": "^8.4.38",
     "prisma": "^5.14.0",
     "tailwindcss": "^3.4.0",
+    "tsx": "^4.22.2",
     "typescript": "^5"
   }
 }
