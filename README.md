@@ -81,6 +81,64 @@ Vercel runs `prisma generate && next build` automatically.
 
 ---
 
+## Deploy the realtime WS server (Fly.io)
+
+Vercel can't host long-lived WebSocket connections, so the Yjs server in `server/yws.ts` needs to run elsewhere. Fly.io's free allowance comfortably covers a single small instance.
+
+### 1. Install + login
+
+```bash
+brew install flyctl     # or curl -L https://fly.io/install.sh | sh
+fly auth login
+```
+
+### 2. Create the app (don't deploy yet)
+
+From the repo root:
+
+```bash
+fly launch --no-deploy --copy-config --name accountmvp-ws
+```
+
+Accept the existing `fly.toml`. Pick a region close to your Vercel deployment (`fly platform regions`).
+
+### 3. Set secrets
+
+The WS server needs the **same** `DATABASE_URL` and `JWT_SECRET` as Vercel (so JWTs issued by Next verify, and Prisma writes to the same Postgres).
+
+```bash
+fly secrets set \
+  DATABASE_URL="postgres://…"   \
+  JWT_SECRET="…"                \
+  --app accountmvp-ws
+```
+
+### 4. Deploy
+
+```bash
+fly deploy --app accountmvp-ws
+```
+
+Verify: `curl https://accountmvp-ws.fly.dev/` returns `yjs ws server`.
+
+### 5. Point Vercel at the WS server
+
+In the Vercel dashboard, add:
+
+```
+NEXT_PUBLIC_YWS_URL = wss://accountmvp-ws.fly.dev
+```
+
+Redeploy Vercel (env-var changes don't auto-rebuild). Open the same workspace in two browsers — typing in one should appear live in the other.
+
+### Troubleshooting
+
+- `fly logs --app accountmvp-ws` shows auth/connection events.
+- If clients fail to connect: confirm `JWT_SECRET` matches Vercel exactly (no trailing newline in `fly secrets`).
+- If sync works but versions aren't being written: confirm `DATABASE_URL` is the same Postgres Vercel uses, and that the Prisma client was generated (the Dockerfile does this in the build).
+
+---
+
 ## Routes
 
 | Route | Description |

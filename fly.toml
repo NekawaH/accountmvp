@@ -1,0 +1,43 @@
+# fly.toml — config for the Yjs WebSocket server.
+#
+# Replace `app` below with your chosen Fly app name (must be unique).
+# After `fly launch --no-deploy` Fly will overwrite this file; keep
+# the [env], [http_service], [[vm]], and [checks] blocks intact.
+
+app = "accountmvp-ws"
+primary_region = "iad"   # change to nearest region; see `fly platform regions`
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  WS_PORT = "1234"
+  NODE_ENV = "production"
+
+[http_service]
+  # Fly terminates TLS at the edge (wss://) and forwards plain HTTP/1.1
+  # upgrade requests to internal_port. WebSocket upgrades are handled
+  # transparently — no special config needed beyond exposing http.
+  internal_port = 1234
+  force_https = true
+  auto_stop_machines = false   # WS sessions are long-lived; don't stop mid-edit
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    hard_limit = 200
+    soft_limit = 150
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+
+# A plain GET to / returns "yjs ws server" (see server/yws.ts line 189) —
+# use that as the health probe.
+[[http_service.checks]]
+  interval = "30s"
+  timeout = "5s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/"

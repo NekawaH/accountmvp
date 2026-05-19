@@ -1,0 +1,15 @@
+# Keep the Docker image small and avoid leaking local state.
+node_modules
+.next
+.git
+.env
+.env.*
+!.env.example
+.vercel
+.claude
+.DS_Store
+*.log
+README.md
+app
+prisma/migrations
+# (prisma/schema.prisma is still copied — prisma generate needs it.)
