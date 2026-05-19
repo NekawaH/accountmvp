@@ -563,12 +563,7 @@ export default function WorkspacePage() {
         <button
           onClick={() => safeNavigate(() => router.push('/'))}
           className="block w-full text-xs text-center text-gray-500 hover:text-gray-700"
-        >← Workspaces</button>
-        <form action="/api/auth/logout" method="POST" onSubmit={e => {
-          if (hasDirtyFiles()) { e.preventDefault(); safeNavigate(() => (e.target as HTMLFormElement).submit()) }
-        }}>
-          <button type="submit" className="w-full text-xs text-center text-gray-400 hover:text-gray-600">Sign out</button>
-        </form>
+        >← Dashboard</button>
       </div>
     </div>
   )
