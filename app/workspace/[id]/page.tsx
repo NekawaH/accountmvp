@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import WorkspaceShell, { formatCode, EXAMPLES } from '../../components/WorkspaceShell'
+import FileHistoryDrawer from '../../components/FileHistoryDrawer'
 
 interface PseudoFile {
   id: string
@@ -51,6 +52,7 @@ export default function WorkspacePage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const vfsMirror = useRef<Record<string, string>>({})
   const creatingFileRef = useRef(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   const loadFileList = useCallback(async () => {
     const res = await fetch(`/api/files?workspaceId=${workspaceId}&withContent=true`)
@@ -135,6 +137,32 @@ export default function WorkspacePage() {
         setActiveFile(created)
       }
     }
+  }
+
+  async function saveActiveFileWithMessage(message: string) {
+    if (!activeFile) return
+    setSaving(true)
+    try {
+      await fetch(`/api/files/${activeFile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: code, message }),
+      })
+      vfsMirror.current[activeFile.name] = code
+      delete drafts.current[activeFile.id]
+      setDirtyIds(prev => { const next = new Set(prev); next.delete(activeFile.id); return next })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function onRestored(content: string) {
+    if (!activeFile) return
+    setCode(content)
+    vfsMirror.current[activeFile.name] = content
+    delete drafts.current[activeFile.id]
+    setDirtyIds(prev => { const next = new Set(prev); next.delete(activeFile.id); return next })
+    setActiveFile(prev => prev ? { ...prev, content } : prev)
   }
 
   async function saveAllDrafts() {
@@ -555,6 +583,12 @@ export default function WorkspacePage() {
         className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
       >{saving ? 'Saving…' : 'Save'}</button>
       <button
+        onClick={() => setShowHistory(v => !v)}
+        disabled={!activeFile}
+        className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+        title={activeFile ? 'View file history' : 'Open a file to see its history'}
+      >History</button>
+      <button
         onClick={() => {
           const ta = document.getElementById('inputBox') as HTMLTextAreaElement | null
           if (!ta) return
@@ -610,6 +644,18 @@ export default function WorkspacePage() {
         onAfterRun={onAfterRun}
         sidebar={sidebar}
       />
+
+      {showHistory && activeFile && (
+        <FileHistoryDrawer
+          fileId={activeFile.id}
+          fileName={activeFile.name}
+          currentContent={code}
+          canEdit={true}
+          onClose={() => setShowHistory(false)}
+          onRestored={onRestored}
+          onSaveWithMessage={saveActiveFileWithMessage}
+        />
+      )}
     </>
   )
 }

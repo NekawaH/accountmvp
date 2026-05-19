@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
+import { recordVersion } from '@/lib/fileVersions'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET() {
@@ -26,12 +27,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Name required' }, { status: 400 })
   }
 
-  const workspace = await prisma.workspace.create({
-    data: { userId: session.userId, name: name.trim() },
-  })
-  // Seed with main.psc
-  await prisma.pseudoFile.create({
-    data: { workspaceId: workspace.id, name: 'main.psc', content: '' },
+  const workspace = await prisma.$transaction(async tx => {
+    const ws = await tx.workspace.create({
+      data: { userId: session.userId, name: name.trim() },
+    })
+    // Seed with main.psc + initial version
+    const seeded = await tx.pseudoFile.create({
+      data: { workspaceId: ws.id, name: 'main.psc', content: '' },
+    })
+    await recordVersion(seeded.id, '', session.userId, null, tx)
+    return ws
   })
   return NextResponse.json(workspace, { status: 201 })
 }

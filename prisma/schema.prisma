@@ -22,6 +22,7 @@ model User {
   invitationsReceived WorkspaceInvitation[]   @relation("InvitationsReceived")
   collaborations      WorkspaceCollaborator[]
   submissions         Submission[]
+  fileVersions        FileVersion[]
 }
 
 model Problem {
@@ -99,12 +100,26 @@ model WorkspaceCollaborator {
 }
 
 model PseudoFile {
-  id          String    @id @default(cuid())
+  id          String        @id @default(cuid())
   workspaceId String
   name        String
-  content     String    @default("")
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  content     String        @default("")
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  versions    FileVersion[]
 
   @@unique([workspaceId, name])
+}
+
+model FileVersion {
+  id        String     @id @default(cuid())
+  fileId    String
+  content   String
+  authorId  String?
+  message   String?
+  createdAt DateTime   @default(now())
+  file      PseudoFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  author    User?      @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([fileId, createdAt])
 }

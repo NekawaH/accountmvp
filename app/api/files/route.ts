@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
+import { recordVersion } from '@/lib/fileVersions'
 import { NextRequest, NextResponse } from 'next/server'
 
 async function authorizeWorkspace(userId: string, workspaceId: string) {
@@ -52,10 +53,14 @@ export async function POST(req: NextRequest) {
   const ws = await authorizeWorkspace(session.userId, workspaceId)
   if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const file = await prisma.pseudoFile.upsert({
-    where: { workspaceId_name: { workspaceId, name } },
-    create: { workspaceId, name, content: content ?? '' },
-    update: { content: content ?? '' },
+  const file = await prisma.$transaction(async tx => {
+    const f = await tx.pseudoFile.upsert({
+      where: { workspaceId_name: { workspaceId, name } },
+      create: { workspaceId, name, content: content ?? '' },
+      update: { content: content ?? '' },
+    })
+    await recordVersion(f.id, content ?? '', session.userId, null, tx)
+    return f
   })
   return NextResponse.json(file)
 }

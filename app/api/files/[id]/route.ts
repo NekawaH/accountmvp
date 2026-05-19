@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/session'
+import { recordVersion } from '@/lib/fileVersions'
 import { NextRequest, NextResponse } from 'next/server'
 
 async function getFile(userId: string, fileId: string) {
@@ -46,10 +47,19 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const existing = await canEditFile(session.userId, params.id)
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const { content } = await req.json()
-  const updated = await prisma.pseudoFile.update({
-    where: { id: params.id },
-    data: { content },
+  const { content, message } = await req.json()
+  if (typeof content !== 'string') {
+    return NextResponse.json({ error: 'content required' }, { status: 400 })
+  }
+  const trimmedMessage = typeof message === 'string' && message.trim() ? message.trim().slice(0, 200) : null
+
+  const updated = await prisma.$transaction(async tx => {
+    const file = await tx.pseudoFile.update({
+      where: { id: params.id },
+      data: { content },
+    })
+    await recordVersion(file.id, content, session.userId, trimmedMessage, tx)
+    return file
   })
   return NextResponse.json(updated)
 }
