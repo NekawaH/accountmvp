@@ -725,6 +725,7 @@
         const constants = new Set();
         const functions = definitions.functions || {};
         const classes = definitions.classes || {};
+        const types = definitions.types || {};
         const fileHandles = {};
 
         const builtins = {
@@ -1074,7 +1075,18 @@
                 case 'noop':
                     return null;
                 case 'declare':
-                    vars[node.id] = undefined;
+                    // For user-defined record TYPEs, allocate an object so
+                    // field assignments like `guquan.name <- "..."` work
+                    // without first instantiating. Leaves primitives undefined.
+                    if (node.baseType && types[node.baseType]) {
+                        const obj = {};
+                        for (const attr of Object.keys(types[node.baseType].attrs || {})) {
+                            obj[attr] = undefined;
+                        }
+                        vars[node.id] = obj;
+                    } else {
+                        vars[node.id] = undefined;
+                    }
                     return null;
                 case 'declare_array':
                     vars[node.id] = makeArray(node.dims);
