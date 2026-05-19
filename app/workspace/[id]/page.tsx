@@ -289,16 +289,21 @@ export default function WorkspacePage() {
     const w = window as any
     if (activeFile && activeFile.name.endsWith('.psc')) {
       vfsMirror.current[activeFile.name] = code
-      await fetch(`/api/files/${activeFile.id}`, {
+      // Fire autosave in the background so Run starts immediately. The
+      // interpreter only reads w.vfs (set synchronously below), so the
+      // network round-trip doesn't need to block execution.
+      const fileId = activeFile.id
+      fetch(`/api/files/${fileId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: code }),
-      })
-      delete drafts.current[activeFile.id]
-      setDirtyIds(prev => {
-        if (!prev.has(activeFile.id)) return prev
-        const next = new Set(prev); next.delete(activeFile.id); return next
-      })
+      }).then(() => {
+        delete drafts.current[fileId]
+        setDirtyIds(prev => {
+          if (!prev.has(fileId)) return prev
+          const next = new Set(prev); next.delete(fileId); return next
+        })
+      }).catch(() => {})
     }
     w.vfs = { ...vfsMirror.current }
   }

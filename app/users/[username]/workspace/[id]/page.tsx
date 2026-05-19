@@ -190,11 +190,14 @@ export default function PublicWorkspacePage() {
     const w = window as any
     if (canEdit && activeFile) {
       vfsMirror.current[activeFile.name] = code
-      await fetch(`/api/files/${activeFile.id}`, {
+      // Fire autosave in the background — the interpreter only needs
+      // w.vfs (set synchronously below), so Run starts without waiting
+      // on the network round-trip.
+      fetch(`/api/files/${activeFile.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: code }),
-      })
+      }).catch(() => {})
     }
     w.vfs = { ...vfsMirror.current }
   }
