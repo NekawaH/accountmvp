@@ -39,6 +39,7 @@ export default function WorkspacePage() {
   const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null)
   const [confirmRemoveUserId, setConfirmRemoveUserId] = useState<string | null>(null)
   const drafts = useRef<Record<string, string>>({})
+  const renameCommittingRef = useRef<string | null>(null)
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set())
   const [showLeaveWarning, setShowLeaveWarning] = useState(false)
   const pendingLeave = useRef<(() => void) | null>(null)
@@ -243,23 +244,35 @@ export default function WorkspacePage() {
   }
 
   async function commitRename(f: PseudoFile) {
-    let name = renameValue.trim()
-    setRenamingId(null)
-    if (!name || name === f.name) return
-    if (!name.endsWith('.psc') && !name.endsWith('.txt')) name += '.psc'
-    const content = vfsMirror.current[f.name] ?? ''
-    const res = await fetch('/api/files', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workspaceId, name, content }),
-    })
-    if (!res.ok) return
-    const created: LoadedFile = await res.json()
-    await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
-    delete vfsMirror.current[f.name]
-    vfsMirror.current[name] = content
-    setFiles(prev => prev.filter(x => x.id !== f.id).concat(created).sort((a, b) => a.name.localeCompare(b.name)))
-    if (activeFile?.id === f.id) setActiveFile(created)
+    // Both Enter and onBlur fire commitRename (onBlur fires when the input
+    // unmounts after Enter's setRenamingId(null)), so without a synchronous
+    // guard the POST/DELETE pair runs twice and creates a duplicate file.
+    // A state-based check doesn't work because the second handler's closure
+    // can still see the pre-update renamingId.
+    if (renameCommittingRef.current === f.id) return
+    renameCommittingRef.current = f.id
+    try {
+      let name = renameValue.trim()
+      setRenamingId(null)
+      if (!name || name === f.name) return
+      if (!name.endsWith('.psc') && !name.endsWith('.txt')) name += '.psc'
+      if (files.some(x => x.id !== f.id && x.name === name)) return
+      const content = vfsMirror.current[f.name] ?? (activeFile?.id === f.id ? code : '')
+      const res = await fetch('/api/files', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, name, content }),
+      })
+      if (!res.ok) return
+      const created: LoadedFile = await res.json()
+      await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
+      delete vfsMirror.current[f.name]
+      vfsMirror.current[name] = content
+      setFiles(prev => prev.filter(x => x.id !== f.id).concat(created).sort((a, b) => a.name.localeCompare(b.name)))
+      if (activeFile?.id === f.id) setActiveFile(created)
+    } finally {
+      renameCommittingRef.current = null
+    }
   }
 
   async function sendInvite() {
