@@ -196,6 +196,7 @@ export default function WorkspaceShell({
   const awaitingInputRef = useRef(false)
   const terminatedRef = useRef(false)
   const interpreterReady = useRef(false)
+  const runningRef = useRef(false)
 
   const lineCount = code.split('\n').length
 
@@ -233,8 +234,14 @@ export default function WorkspaceShell({
   function terminateProgram() {
     terminatedRef.current = true
     awaitingInputRef.current = false
+    const w = window as any
+    // Tell the interpreter to bail out on its next yield point. Without this
+    // a tight loop (e.g. WHILE TRUE ENDWHILE) would only stop when the step
+    // cap is hit.
+    if (w.pseudoIDE && typeof w.pseudoIDE.requestTerminate === 'function') {
+      w.pseudoIDE.requestTerminate()
+    }
     if (inputHandlerRef.current) {
-      const w = window as any
       if (w._termInputEl) w._termInputEl.value = ''
       inputHandlerRef.current({ key: 'Enter' })
     }
@@ -242,10 +249,20 @@ export default function WorkspaceShell({
   }
 
   async function runCode() {
+    // Synchronous re-entry guard. Without this, spam-clicking Run while
+    // onBeforeRun (autosave) is still in flight launches multiple concurrent
+    // interpreter instances that share interpreter state and starve the
+    // event loop, leaving the button visually stuck on "Run".
+    if (runningRef.current) return
+    runningRef.current = true
+    setRunning(true)
+
     initInterpreter()
     const w = window as any
     if (!w.pseudoIDE) {
       if (terminalRef.current) terminalRef.current.value = 'Error: interpreter not loaded yet, try again.'
+      runningRef.current = false
+      setRunning(false)
       return
     }
     terminatedRef.current = false
@@ -257,13 +274,24 @@ export default function WorkspaceShell({
     if (typeof w.pseudoIDE.setStepLimit === 'function') {
       w.pseudoIDE.setStepLimit(10_000_000)
     }
+    // Cooperatively yield to the event loop every N steps so the UI stays
+    // responsive (Run→Stop swap, terminal scroll, etc.) and the Stop button
+    // can actually interrupt tight loops. Kept low so empty-body tight
+    // loops like `WHILE TRUE ENDWHILE` still yield frequently enough to
+    // paint the Stop button and accept its click.
+    if (typeof w.pseudoIDE.setYieldEvery === 'function') {
+      w.pseudoIDE.setYieldEvery(1_000)
+    }
 
-    if (onBeforeRun) await onBeforeRun()
-    else w.vfs = { ...(w.vfs ?? {}) }
+    // Paint the Stop button before doing any blocking work (autosave or
+    // the interpreter itself).
+    await new Promise<void>(resolve => setTimeout(resolve, 0))
 
-    const vfsBefore: Record<string, string> = { ...w.vfs }
-    setRunning(true)
     try {
+      if (onBeforeRun) await onBeforeRun()
+      else w.vfs = { ...(w.vfs ?? {}) }
+
+      const vfsBefore: Record<string, string> = { ...w.vfs }
       await w.pseudoIDE.run(code, null)
       if (onAfterRun) await onAfterRun(vfsBefore, { ...w.vfs })
     } catch (err: any) {
@@ -272,6 +300,7 @@ export default function WorkspaceShell({
       }
     } finally {
       awaitingInputRef.current = false
+      runningRef.current = false
       setRunning(false)
     }
   }
@@ -476,6 +505,12 @@ export default function WorkspaceShell({
                 style={{ lineHeight: '21px' }}
                 onKeyDown={e => {
                   const ta = terminalRef.current!
+                  // Always allow copy / select-all / other modifier shortcuts
+                  // so the user can copy console output.
+                  if (e.ctrlKey || e.metaKey) return
+                  // Always allow caret navigation through existing output.
+                  const nav = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown','Shift','Tab']
+                  if (nav.includes(e.key)) return
                   if (e.key === 'Enter') {
                     if (!awaitingInputRef.current || !inputHandlerRef.current) { e.preventDefault(); return }
                     e.preventDefault()
@@ -487,11 +522,14 @@ export default function WorkspaceShell({
                     inputHandlerRef.current({ key: 'Enter' })
                     return
                   }
-                  const nav = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','PageUp','PageDown']
-                  if (!awaitingInputRef.current && !nav.includes(e.key)) { e.preventDefault(); return }
+                  if (!awaitingInputRef.current) { e.preventDefault(); return }
                   if ((e.key === 'Backspace' || e.key === 'Delete') && ta.selectionStart <= protectedLenRef.current) { e.preventDefault() }
                 }}
                 onClick={() => {
+                  // Only snap caret to the end when actively awaiting INPUT —
+                  // otherwise let the user freely click/select within the
+                  // existing output so they can copy it.
+                  if (!awaitingInputRef.current) return
                   const ta = terminalRef.current!
                   if (ta.selectionStart < protectedLenRef.current) { ta.selectionStart = ta.selectionEnd = ta.value.length }
                 }}

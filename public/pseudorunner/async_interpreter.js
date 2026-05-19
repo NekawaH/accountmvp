@@ -14,6 +14,34 @@
     let stepLimit = 0;
     const STEP_LIMIT_ERROR = '__STEP_LIMIT_EXCEEDED__';
 
+    // Periodic macrotask yield so the browser can paint and process clicks
+    // (e.g. the Stop button) during long runs. yieldEvery = 0 disables the
+    // behavior (used by the server-side grader where any setTimeout would
+    // tank case throughput). The workspace IDE calls setYieldEvery(N) to
+    // enable cooperative yielding every N execution steps.
+    let yieldEvery = 0;
+    let yieldCounter = 0;
+    let terminationRequested = false;
+    const TERMINATED_ERROR = '__TERMINATED__';
+    const _yieldChannel = (typeof MessageChannel !== 'undefined') ? new MessageChannel() : null;
+    function _macroYield() {
+        if (_yieldChannel) {
+            return new Promise(resolve => {
+                _yieldChannel.port1.onmessage = () => resolve();
+                _yieldChannel.port2.postMessage(null);
+            });
+        }
+        return new Promise(resolve => setTimeout(resolve, 0));
+    }
+    async function _maybeYield() {
+        if (terminationRequested) throw new Error(TERMINATED_ERROR);
+        if (yieldEvery > 0 && ++yieldCounter >= yieldEvery) {
+            yieldCounter = 0;
+            await _macroYield();
+            if (terminationRequested) throw new Error(TERMINATED_ERROR);
+        }
+    }
+
     function appendConsole(text) {
         if (!consoleEl) return;
         consoleEl.textContent += text;
@@ -1041,6 +1069,7 @@
                 stepCount++;
                 if (stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
             }
+            await _maybeYield();
             switch (node.type) {
                 case 'noop':
                     return null;
@@ -1164,6 +1193,7 @@
                 case 'while':
                     while (await evalExpr(node.condition, localBindings, instance)) {
                         if (stepLimit > 0 && ++stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
+                        await _maybeYield();
                         const r = await execBlock(node.body, localBindings, instance);
                         if (r && r.__returned) return r;
                     }
@@ -1171,6 +1201,7 @@
                 case 'repeat': {
                     do {
                         if (stepLimit > 0 && ++stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
+                        await _maybeYield();
                         const r = await execBlock(node.body, localBindings, instance);
                         if (r && r.__returned) return r;
                     } while (!(await evalExpr(node.until, localBindings, instance)));
@@ -1182,6 +1213,7 @@
                     setVar(node.var, cur);
                     while (getVar(node.var) <= end) {
                         if (stepLimit > 0 && ++stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
+                        await _maybeYield();
                         const r = await execBlock(node.body, localBindings, instance);
                         if (r && r.__returned) return r;
                         setVar(node.var, getVar(node.var) + 1);
@@ -1314,6 +1346,8 @@
         // workspace runs are unaffected. Any positive value caps execNode
         // invocations.
         setStepLimit(n) { stepLimit = n | 0; },
+        setYieldEvery(n) { yieldEvery = Math.max(0, n | 0); yieldCounter = 0; },
+        requestTerminate() { terminationRequested = true; },
 
         // Populated after each run() so the server-side grader can tell a
         // step-limit error apart from regular runtime errors.
@@ -1323,6 +1357,8 @@
             if (vfs) window.vfs = vfs;
             if (!window.vfs) window.vfs = {};
             stepCount = 0;
+            yieldCounter = 0;
+            terminationRequested = false;
             this.lastRun = { stepLimitExceeded: false, stepsUsed: 0, error: null };
             try {
                 const parsed = parse(source);
@@ -1332,6 +1368,9 @@
                 if (e && e.message === STEP_LIMIT_ERROR) {
                     this.lastRun.stepLimitExceeded = true;
                     appendConsole('Error: time limit exceeded');
+                } else if (e && e.message === TERMINATED_ERROR) {
+                    // Silent — caller (the IDE Stop button) is responsible for
+                    // any "[Terminated]" message it wants to show.
                 } else {
                     this.lastRun.error = e && e.message;
                     appendConsole('Error: ' + (e && e.message));
