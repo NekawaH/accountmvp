@@ -297,7 +297,7 @@ export default function DashboardPage() {
                       <button
                         onClick={() => togglePublic(ws)}
                         title={ws.isPublic ? 'Public — click to make private' : 'Private — click to make public'}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors ${ws.isPublic ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors w-[88px] text-center ${ws.isPublic ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
                       >{ws.isPublic ? '🌐 Public' : '🔒 Private'}</button>
                       <button onClick={() => router.push(`/workspace/${ws.id}`)} className="text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors">Open</button>
                       <button onClick={() => setConfirmDeleteId(ws.id)} className="text-xs px-2.5 py-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Delete workspace">✕</button>
