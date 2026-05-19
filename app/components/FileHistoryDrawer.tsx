@@ -81,7 +81,10 @@ export default function FileHistoryDrawer({
 
   const diffParts = useMemo(() => {
     if (!selectedDetail) return null
-    return diffLines(selectedDetail.content, currentContent)
+    // Normalize trailing newline so diffLines doesn't treat the last line as
+    // changed purely because one side lacks a terminating \n.
+    const pad = (s: string) => (s.endsWith('\n') ? s : s + '\n')
+    return diffLines(pad(selectedDetail.content), pad(currentContent))
   }, [selectedDetail, currentContent])
 
   async function doRestore() {

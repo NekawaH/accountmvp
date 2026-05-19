@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import WorkspaceShell, { formatCode, EXAMPLES } from '../../../../components/WorkspaceShell'
+import FileHistoryDrawer from '../../../../components/FileHistoryDrawer'
+import { Peer } from '../../../../components/useYjsTextarea'
 
 interface PseudoFile { id: string; name: string; updatedAt: string }
 interface LoadedFile extends PseudoFile { content: string }
@@ -43,6 +45,9 @@ export default function PublicWorkspacePage() {
   const renameCommittingRef = useRef<string | null>(null)
   const [showLeaveWarning, setShowLeaveWarning] = useState(false)
   const pendingLeave = useRef<(() => void) | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
+  const [currentUser, setCurrentUser] = useState<{ username: string; avatarUrl: string | null } | null>(null)
+  const [peers, setPeers] = useState<Peer[]>([])
 
   const load = useCallback(async () => {
     const [wsRes, profileRes, filesRes] = await Promise.all([
@@ -58,6 +63,7 @@ export default function PublicWorkspacePage() {
     const me: Profile | null = profileRes.ok ? await profileRes.json() : null
 
     if (me) {
+      setCurrentUser({ username: me.username, avatarUrl: me.avatarUrl ?? null })
       if (wsData.user.username === me.username) {
         router.replace(`/workspace/${workspaceId}`)
         return
@@ -149,6 +155,28 @@ export default function PublicWorkspacePage() {
     })
     vfsMirror.current[activeFile.name] = code
     setSaving(false)
+  }
+
+  async function saveActiveFileWithMessage(message: string) {
+    if (!activeFile) return
+    setSaving(true)
+    try {
+      await fetch(`/api/files/${activeFile.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: code, message }),
+      })
+      vfsMirror.current[activeFile.name] = code
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function onRestored(content: string) {
+    if (!activeFile) return
+    setCode(content)
+    vfsMirror.current[activeFile.name] = content
+    setActiveFile(prev => prev ? { ...prev, content } : prev)
   }
 
   async function deleteFile(f: PseudoFile) {
@@ -279,14 +307,18 @@ export default function PublicWorkspacePage() {
         </div>
         {ws?.collaborators && ws.collaborators.length > 0 && (
           <div className="flex items-center gap-1 mt-2 flex-wrap">
-            {ws.collaborators.map(c => (
-              <button key={c.userId} onClick={() => router.push(`/users/${c.user.username}`)} title={c.user.username} className="hover:opacity-80">
-                {c.user.avatarUrl
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={c.user.avatarUrl} alt={c.user.username} className="w-5 h-5 rounded-full object-cover border border-white" />
-                  : <div className="w-5 h-5 rounded-full bg-gray-300 border border-white" />}
-              </button>
-            ))}
+            {ws.collaborators.map(c => {
+              const isLive = peers.some(p => p.username === c.user.username)
+              return (
+                <button key={c.userId} onClick={() => router.push(`/users/${c.user.username}`)} title={c.user.username + (isLive ? ' (live)' : '')} className="relative hover:opacity-80">
+                  {c.user.avatarUrl
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={c.user.avatarUrl} alt={c.user.username} className="w-5 h-5 rounded-full object-cover border border-white" />
+                    : <div className="w-5 h-5 rounded-full bg-gray-300 border border-white" />}
+                  {isLive && <span className="absolute -bottom-0.5 -right-0.5 w-1.5 h-1.5 bg-green-500 rounded-full ring-1 ring-white" />}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -430,6 +462,12 @@ export default function PublicWorkspacePage() {
           >{saving ? 'Saving…' : 'Save'}</button>
         </>
       )}
+      <button
+        onClick={() => setShowHistory(v => !v)}
+        disabled={!activeFile}
+        className="text-xs px-2.5 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50"
+        title={activeFile ? 'View file history' : 'Open a file to see its history'}
+      >History</button>
       {!canEdit && (
         <button onClick={forkWorkspace} disabled={forking}
           className="text-xs px-3 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 text-gray-700 rounded font-semibold border border-gray-300"
@@ -470,7 +508,22 @@ export default function PublicWorkspacePage() {
         toolbarExtras={toolbarExtras}
         onBeforeRun={onBeforeRun}
         sidebar={sidebar}
+        realtimeFileId={canEdit ? (activeFile?.id ?? null) : null}
+        currentUser={currentUser}
+        onPeersChange={setPeers}
       />
+
+      {showHistory && activeFile && (
+        <FileHistoryDrawer
+          fileId={activeFile.id}
+          fileName={activeFile.name}
+          currentContent={code}
+          canEdit={canEdit}
+          onClose={() => setShowHistory(false)}
+          onRestored={onRestored}
+          onSaveWithMessage={saveActiveFileWithMessage}
+        />
+      )}
     </>
   )
 }
