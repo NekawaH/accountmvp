@@ -250,6 +250,14 @@ export default function WorkspaceShell({
     }
     terminatedRef.current = false
 
+    // Workspaces get a much larger step cap than the problem-solving grader
+    // (~10M vs 500k). Step counting pauses while awaiting INPUT, so this
+    // bounds actual computation, not wall-clock time spent waiting on the
+    // user — long interactive sessions are still fine.
+    if (typeof w.pseudoIDE.setStepLimit === 'function') {
+      w.pseudoIDE.setStepLimit(10_000_000)
+    }
+
     if (onBeforeRun) await onBeforeRun()
     else w.vfs = { ...(w.vfs ?? {}) }
 
