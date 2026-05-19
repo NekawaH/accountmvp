@@ -175,21 +175,35 @@ const problems: SeedProblem[] = [
     slug: 'mean-median-mode',
     title: 'Mean, median, and mode',
     statement:
-      'Read N, then N integers (one per line). Output, on three separate lines:\n' +
+      'Read N, then N integers (one per line, given in arbitrary order — they ' +
+      'are NOT pre-sorted). Output, on three separate lines:\n' +
       '  1. the mean (arithmetic average)\n' +
-      '  2. the median (middle value when sorted)\n' +
+      '  2. the median (middle value when sorted; if N is even, the mean of ' +
+      'the two middle values)\n' +
       '  3. the mode (most frequent value; if multiple tie, output the smallest)\n' +
       '\n' +
-      'Guarantees: N is odd (so the median is unique), and the sum is divisible ' +
-      'by N (so the mean is an integer).',
+      'Guarantees: the mean and the median are always integers (so for even N ' +
+      'the two middle values share parity, and the sum is always divisible by N).',
     difficulty: 4,
-    examples: [{ input: '5\n2\n2\n3\n4\n4', output: '3\n3\n2' }],
+    examples: [
+      { input: '5\n3\n1\n4\n2\n5', output: '3\n3\n1' },
+      { input: '4\n40\n10\n30\n20', output: '25\n25\n10' },
+    ],
     testCases: [
-      { stdin: '5\n1\n2\n3\n4\n5\n',  expectedStdout: '5\n1\n2\n3\n4\n5\n3\n3\n1\n' },
-      { stdin: '5\n2\n2\n3\n4\n4\n',  expectedStdout: '5\n2\n2\n3\n4\n4\n3\n3\n2\n' },
-      { stdin: '5\n5\n5\n5\n5\n5\n',  expectedStdout: '5\n5\n5\n5\n5\n5\n5\n5\n5\n' },
-      { stdin: '3\n10\n20\n30\n',     expectedStdout: '3\n10\n20\n30\n20\n20\n10\n' },
-      { stdin: '5\n1\n1\n2\n3\n3\n',  expectedStdout: '5\n1\n1\n2\n3\n3\n2\n2\n1\n' },
+      // Odd N, unsorted, all distinct — no mode tie.
+      { stdin: '5\n3\n1\n4\n2\n5\n',          expectedStdout: '5\n3\n1\n4\n2\n5\n3\n3\n1\n' },
+      // Odd N, unsorted, mode tie broken by "smallest wins".
+      { stdin: '5\n5\n2\n1\n5\n2\n',          expectedStdout: '5\n5\n2\n1\n5\n2\n3\n2\n2\n' },
+      // Even N, unsorted, distinct — median = mean of two middles.
+      { stdin: '4\n40\n10\n30\n20\n',         expectedStdout: '4\n40\n10\n30\n20\n25\n25\n10\n' },
+      // Even N, unsorted, mode tie (1 and 5 tie → 1 wins), median = (2+4)/2 = 3.
+      { stdin: '6\n4\n1\n5\n2\n5\n1\n',       expectedStdout: '6\n4\n1\n5\n2\n5\n1\n3\n3\n1\n' },
+      // Even N with negatives — median = (-1+3)/2 = 1, all unique so smallest is mode.
+      { stdin: '6\n5\n-2\n3\n-3\n-1\n4\n',    expectedStdout: '6\n5\n-2\n3\n-3\n-1\n4\n1\n1\n-3\n' },
+      // Even N, all identical.
+      { stdin: '4\n7\n7\n7\n7\n',             expectedStdout: '4\n7\n7\n7\n7\n7\n7\n7\n' },
+      // N = 1 trivial edge.
+      { stdin: '1\n42\n',                     expectedStdout: '1\n42\n42\n42\n42\n' },
     ],
   },
 ]
