@@ -36,6 +36,8 @@ export default function PublicWorkspacePage() {
   const [showNewFile, setShowNewFile] = useState(false)
   const [newFileName, setNewFileName] = useState('')
   const [confirmDeleteFileId, setConfirmDeleteFileId] = useState<string | null>(null)
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
   const vfsMirror = useRef<Record<string, string>>({})
   const creatingFileRef = useRef(false)
   const [showLeaveWarning, setShowLeaveWarning] = useState(false)
@@ -154,6 +156,26 @@ export default function PublicWorkspacePage() {
     delete vfsMirror.current[f.name]
     setConfirmDeleteFileId(null)
     setFiles(prev => prev.filter(x => x.id !== f.id))
+  }
+
+  async function commitRename(f: PseudoFile) {
+    let name = renameValue.trim()
+    setRenamingId(null)
+    if (!name || name === f.name) return
+    if (!name.endsWith('.psc') && !name.endsWith('.txt')) name += '.psc'
+    const content = vfsMirror.current[f.name] ?? (activeFile?.id === f.id ? code : '')
+    const res = await fetch('/api/files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId, name, content }),
+    })
+    if (!res.ok) return
+    const created: LoadedFile = await res.json()
+    await fetch(`/api/files/${f.id}`, { method: 'DELETE' })
+    delete vfsMirror.current[f.name]
+    vfsMirror.current[name] = content
+    setFiles(prev => prev.filter(x => x.id !== f.id).concat(created).sort((a, b) => a.name.localeCompare(b.name)))
+    if (activeFile?.id === f.id) setActiveFile(created)
   }
 
   async function forkWorkspace() {
@@ -287,14 +309,37 @@ export default function PublicWorkspacePage() {
                 <button onClick={() => setConfirmDeleteFileId(null)} className="text-xs px-1.5 py-0.5 bg-gray-200 hover:bg-gray-300 rounded font-medium flex-shrink-0">No</button>
               </div>
             ) : (
-              <div className="flex items-center justify-between cursor-pointer" onClick={() => openFile(f)}>
-                <span className="truncate flex-1">
-                  {f.name}
-                  {activeFile?.id === f.id && code !== (vfsMirror.current[f.name] ?? '') && (
-                    <span className="ml-1 text-yellow-500" title="Unsaved changes">●</span>
-                  )}
-                </span>
-                {canEdit && (
+              <div className="flex items-center justify-between cursor-pointer" onClick={() => renamingId !== f.id && openFile(f)}>
+                {canEdit && renamingId === f.id ? (
+                  <input
+                    className="flex-1 text-xs border border-blue-400 rounded px-1 py-0.5 focus:outline-none min-w-0"
+                    value={renameValue}
+                    autoFocus
+                    onChange={e => setRenameValue(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') commitRename(f)
+                      if (e.key === 'Escape') setRenamingId(null)
+                    }}
+                    onBlur={() => commitRename(f)}
+                    onClick={e => e.stopPropagation()}
+                  />
+                ) : (
+                  <span
+                    className="truncate flex-1"
+                    onDoubleClick={canEdit ? (e => {
+                      e.stopPropagation()
+                      setRenamingId(f.id)
+                      setRenameValue(f.name)
+                    }) : undefined}
+                    title={canEdit ? 'Double-click to rename' : undefined}
+                  >
+                    {f.name}
+                    {activeFile?.id === f.id && code !== (vfsMirror.current[f.name] ?? '') && (
+                      <span className="ml-1 text-yellow-500" title="Unsaved changes">●</span>
+                    )}
+                  </span>
+                )}
+                {canEdit && renamingId !== f.id && (
                   <button
                     onClick={e => { e.stopPropagation(); setConfirmDeleteFileId(f.id) }}
                     className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 ml-1 text-xs flex-shrink-0"
