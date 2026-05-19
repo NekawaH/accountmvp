@@ -175,15 +175,12 @@ const problems: SeedProblem[] = [
     slug: 'mean-median-mode',
     title: 'Mean, median, and mode',
     statement:
-      'Read N, then N integers (one per line, given in arbitrary order — they ' +
-      'are NOT pre-sorted). Output, on three separate lines:\n' +
-      '  1. the mean (arithmetic average)\n' +
-      '  2. the median (middle value when sorted; if N is even, the mean of ' +
-      'the two middle values)\n' +
-      '  3. the mode (most frequent value; if multiple tie, output the smallest)\n' +
+      'Read N, then N integers. Output, on three separate lines:\n' +
+      '  1. the mean\n' +
+      '  2. the median\n' +
+      '  3. the mode (if multiple tie, output the smallest)\n' +
       '\n' +
-      'Guarantees: the mean and the median are always integers (so for even N ' +
-      'the two middle values share parity, and the sum is always divisible by N).',
+      'Guarantees: the mean and the median are always integers.',
     difficulty: 4,
     examples: [
       { input: '5\n3\n1\n4\n2\n5', output: '3\n3\n1' },
