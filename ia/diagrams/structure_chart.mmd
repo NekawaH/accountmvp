@@ -1,14 +1,14 @@
-%%{init: {'flowchart': {'nodeSpacing': 28, 'rankSpacing': 36, 'curve': 'linear'}, 'theme': 'neutral'}}%%
-graph TD
+%%{init: {'flowchart': {'nodeSpacing': 20, 'rankSpacing': 50, 'curve': 'linear', 'htmlLabels': true}, 'theme': 'neutral'}}%%
+graph LR
   ROOT["AccountMVP<br/>collaborative pseudocode workspace"]
 
-  ROOT --> AUTH["<b>Authentication</b><br/>(SC1, SC9)"]
-  ROOT --> WS["<b>Workspace mgmt</b><br/>(SC3, SC4, SC7)"]
-  ROOT --> FILES["<b>File mgmt</b><br/>(SC3, SC8)"]
-  ROOT --> INTERP["<b>Pseudocode interpreter</b><br/>(SC2)"]
-  ROOT --> RT["<b>Realtime co-edit</b><br/>(SC5)"]
-  ROOT --> VC["<b>Version control</b><br/>(SC6)"]
-  ROOT --> PLAT["<b>Platform &amp; perf</b><br/>(SC10)"]
+  ROOT --> AUTH["<b>Authentication</b><br/>SC1, SC9"]
+  ROOT --> WS["<b>Workspace mgmt</b><br/>SC3, SC4, SC7"]
+  ROOT --> FILES["<b>File mgmt</b><br/>SC3, SC8"]
+  ROOT --> INTERP["<b>Pseudocode interpreter</b><br/>SC2"]
+  ROOT --> RT["<b>Realtime co-edit</b><br/>SC5"]
+  ROOT --> VC["<b>Version control</b><br/>SC6"]
+  ROOT --> PLAT["<b>Platform &amp; perf</b><br/>SC10"]
 
   AUTH --> A1[Register]
   AUTH --> A2[Email verify]
@@ -43,7 +43,7 @@ graph TD
   PLAT --> P1[Next.js on Vercel]
   PLAT --> P2[WS server on Fly.io]
   PLAT --> P3[Neon Postgres]
-  PLAT --> P4[Dashboard ≤3s load]
+  PLAT --> P4["Dashboard ≤3s load"]
 
   classDef root fill:#1e3a8a,color:#fff,stroke:#1e3a8a,font-weight:bold;
   classDef sub fill:#dbeafe,stroke:#1e3a8a,color:#1e3a8a;
