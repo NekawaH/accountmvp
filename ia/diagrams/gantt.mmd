@@ -1,0 +1,63 @@
+%%{init: {'theme': 'neutral', 'gantt': {'barHeight': 14, 'fontSize': 11}}}%%
+gantt
+  title AccountMVP — IA project timeline
+  dateFormat YYYY-MM-DD
+  axisFormat %b %d
+  excludes weekends
+
+  section Init
+  Research & planning              :init1, 2025-09-01, 10d
+  Initial design (architecture)    :init2, after init1, 5d
+
+  section Authentication (SC1, SC9)
+  Plan                             :a-plan, after init2, 2d
+  Design (schema, routes)          :a-des,  after a-plan, 2d
+  Develop                          :a-dev,  after a-des, 8d
+  Test                             :a-test, after a-dev, 2d
+  Evaluate                         :a-eval, after a-test, 1d
+
+  section Workspace mgmt (SC3, SC4, SC7)
+  Plan                             :w-plan, after a-eval, 1d
+  Design                           :w-des,  after w-plan, 2d
+  Develop (CRUD, share, fork)      :w-dev,  after w-des, 9d
+  Test                             :w-test, after w-dev, 2d
+  Evaluate                         :w-eval, after w-test, 1d
+
+  section File mgmt (SC3, SC8)
+  Plan                             :f-plan, after w-eval, 1d
+  Design                           :f-des,  after f-plan, 2d
+  Develop (.psc CRUD, mobile UI)   :f-dev,  after f-des, 7d
+  Test                             :f-test, after f-dev, 2d
+  Evaluate                         :f-eval, after f-test, 1d
+
+  section Pseudocode interpreter (SC2)
+  Research lexer/parser approaches :i-res,  after f-eval, 3d
+  Plan                             :i-plan, after i-res, 1d
+  Design AST                       :i-des,  after i-plan, 2d
+  Develop                          :i-dev,  after i-des, 14d
+  Test (sample programs)           :i-test, after i-dev, 3d
+  Evaluate                         :i-eval, after i-test, 1d
+
+  section Realtime co-edit (SC5)
+  Research Yjs / CRDT model        :r-res,  after i-eval, 3d
+  Plan                             :r-plan, after r-res, 1d
+  Design (room model, auth)        :r-des,  after r-plan, 2d
+  Develop (hook + WS server)       :r-dev,  after r-des, 10d
+  Test (two-browser sync)          :r-test, after r-dev, 2d
+  Evaluate                         :r-eval, after r-test, 1d
+
+  section Version control (SC6)
+  Plan                             :v-plan, after r-eval, 1d
+  Design (FileVersion schema)      :v-des,  after v-plan, 2d
+  Develop (history drawer, diff)   :v-dev,  after v-des, 8d
+  Test (restore, attribution)      :v-test, after v-dev, 2d
+  Evaluate                         :v-eval, after v-test, 1d
+
+  section Platform & perf (SC10)
+  Deploy Vercel + Fly.io           :p-dev,  after v-eval, 4d
+  Mobile-viewport regression       :p-test, after p-dev, 3d
+  Perf measurement & tuning        :p-eval, after p-test, 2d
+
+  section Wrap-up
+  Integration testing              :int,    2026-04-20, 7d
+  CritE evaluation writeup         :wrap,   2026-04-27, 14d

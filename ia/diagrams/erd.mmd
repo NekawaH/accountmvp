@@ -1,0 +1,54 @@
+%%{init: {'theme': 'neutral'}}%%
+erDiagram
+  USER ||--o{ WORKSPACE : "owns"
+  USER ||--o{ WORKSPACE_COLLABORATOR : "invited as"
+  USER ||--o{ FILE_VERSION : "authored"
+  USER ||--o{ VERIFICATION_TOKEN : "holds"
+  WORKSPACE ||--o{ WORKSPACE_COLLABORATOR : "has"
+  WORKSPACE ||--o{ PSEUDO_FILE : "contains"
+  WORKSPACE }o--o| WORKSPACE : "forked from"
+  PSEUDO_FILE ||--o{ FILE_VERSION : "tracks"
+
+  USER {
+    string id PK
+    string email UK
+    string username UK
+    string passwordHash
+    string avatarUrl
+    boolean verified
+    datetime createdAt
+  }
+  WORKSPACE {
+    string id PK
+    string userId FK
+    string name
+    boolean isPublic
+    string forkedFromId FK
+    datetime createdAt
+  }
+  WORKSPACE_COLLABORATOR {
+    string workspaceId PK_FK
+    string userId PK_FK
+    datetime addedAt
+  }
+  PSEUDO_FILE {
+    string id PK
+    string workspaceId FK
+    string name
+    text content
+    datetime updatedAt
+  }
+  FILE_VERSION {
+    string id PK
+    string fileId FK
+    string authorId FK
+    text content
+    string message
+    datetime createdAt
+  }
+  VERIFICATION_TOKEN {
+    string id PK
+    string userId FK
+    string token UK
+    datetime expiresAt
+  }

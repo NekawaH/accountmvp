@@ -1,0 +1,53 @@
+%%{init: {'flowchart': {'nodeSpacing': 28, 'rankSpacing': 36, 'curve': 'linear'}, 'theme': 'neutral'}}%%
+graph TD
+  ROOT["AccountMVP<br/>collaborative pseudocode workspace"]
+
+  ROOT --> AUTH["<b>Authentication</b><br/>(SC1, SC9)"]
+  ROOT --> WS["<b>Workspace mgmt</b><br/>(SC3, SC4, SC7)"]
+  ROOT --> FILES["<b>File mgmt</b><br/>(SC3, SC8)"]
+  ROOT --> INTERP["<b>Pseudocode interpreter</b><br/>(SC2)"]
+  ROOT --> RT["<b>Realtime co-edit</b><br/>(SC5)"]
+  ROOT --> VC["<b>Version control</b><br/>(SC6)"]
+  ROOT --> PLAT["<b>Platform &amp; perf</b><br/>(SC10)"]
+
+  AUTH --> A1[Register]
+  AUTH --> A2[Email verify]
+  AUTH --> A3[Login / logout]
+  AUTH --> A4[JWT session cookie]
+  AUTH --> A5[bcrypt hash]
+
+  WS --> W1[Create / rename / delete]
+  WS --> W2[Public vs private]
+  WS --> W3[Collaborator invites]
+  WS --> W4[Fork public workspace]
+
+  FILES --> F1[.psc / .txt CRUD]
+  FILES --> F2[Syntax highlight]
+  FILES --> F3[Mobile responsive UI]
+
+  INTERP --> I1[Lexer]
+  INTERP --> I2[Parser]
+  INTERP --> I3[Async executor]
+  INTERP --> I4[Runtime error reporter]
+
+  RT --> R1[Y.Doc per file]
+  RT --> R2[WS auth token]
+  RT --> R3[Awareness / presence]
+  RT --> R4[Debounced DB flush]
+
+  VC --> V1[FileVersion table]
+  VC --> V2[recordVersion helper]
+  VC --> V3[Diff UI]
+  VC --> V4[Restore]
+
+  PLAT --> P1[Next.js on Vercel]
+  PLAT --> P2[WS server on Fly.io]
+  PLAT --> P3[Neon Postgres]
+  PLAT --> P4[Dashboard ≤3s load]
+
+  classDef root fill:#1e3a8a,color:#fff,stroke:#1e3a8a,font-weight:bold;
+  classDef sub fill:#dbeafe,stroke:#1e3a8a,color:#1e3a8a;
+  classDef leaf fill:#f8fafc,stroke:#94a3b8,color:#0f172a;
+  class ROOT root;
+  class AUTH,WS,FILES,INTERP,RT,VC,PLAT sub;
+  class A1,A2,A3,A4,A5,W1,W2,W3,W4,F1,F2,F3,I1,I2,I3,I4,R1,R2,R3,R4,V1,V2,V3,V4,P1,P2,P3,P4 leaf;

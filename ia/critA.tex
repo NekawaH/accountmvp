@@ -1,0 +1,72 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage[hidelinks]{hyperref}
+\usepackage{titlesec}
+
+\titleformat{\section}{\Large\bfseries}{}{0pt}{}
+\titleformat{\subsection}{\large\bfseries}{}{0pt}{}
+
+\setlist[enumerate]{leftmargin=2.2em,itemsep=0.15em}
+\setlist[itemize]{leftmargin=1.6em,itemsep=0.15em}
+
+\title{Criterion A: Problem Specification}
+\author{}
+\date{}
+
+\begin{document}
+
+\section*{Criterion A: Problem Specification}
+
+\subsection*{Problem scenario}
+
+As an IB Diploma Programme Computer Science student, I and my classmates regularly write, revise, and review pseudocode in the IB-specific notation (\texttt{METHOD}, \texttt{loop while}, \texttt{output}, \texttt{input}). Despite pseudocode being central to the syllabus and to Paper~1 and Paper~2 assessment, no online editor targets the IB dialect: Replit, CodePen, and web-based IDEs all assume Python, JavaScript, or another mainstream language, and provide no parser or interpreter for IB notation. The current peer-review workflow is to paste plain text into Google~Docs or Discord, where there is no execution, no syntax checking, and no concept of simultaneous shared editing. This problem relates directly to the world around me --- collaborative learning in a current educational setting where digital tooling has not caught up with the curriculum --- and to a wider issue in computing, where mature real-time collaborative editing (Google~Docs, VS~Code Live~Share) and per-document version control (Git, Notion) exist for general-purpose work but are absent from education-focused pseudocode environments. The proposed solution is a web-based platform on which students create accounts, organise pseudocode files into workspaces, share their work publicly or with named collaborators, edit the same file simultaneously, and trace per-file revision history.
+
+\subsection*{Computational context}
+
+The platform is a full-stack web application written in \textbf{TypeScript}, chosen for static typing across both client and server so that schema, API contracts, and UI props share a single source of truth. \textbf{Next.js~14} (App Router) provides unified server-side rendering and React client components, removing the need for a separately deployed back end. Persistence uses \textbf{PostgreSQL} on Neon's serverless tier through the \textbf{Prisma} ORM, which generates a fully typed query client from one schema. Real-time co-editing uses \textbf{Yjs} CRDTs over WebSockets, since CRDTs guarantee convergence without server-side conflict resolution; the WebSocket server runs on \textbf{Fly.io} because Vercel (host of the Next.js app) cannot maintain long-lived sockets. Authentication uses bcrypt password hashing and signed JWTs in \texttt{httpOnly} cookies. The IB-pseudocode interpreter is implemented client-side in JavaScript to avoid network round-trips during program execution.
+
+\begin{center}
+\begin{tabular}{|p{3.4cm}|p{3.0cm}|p{4.0cm}|p{5.4cm}|}
+\hline
+\textbf{Context} & \textbf{Chosen} & \textbf{Alternatives considered} & \textbf{Justification} \\
+\hline
+Main language & TypeScript & Python (Django), Java (Spring) & Type-safety across client/server; shared models; large ecosystem for web. \\
+\hline
+Framework & Next.js 14 & Express + React SPA, SvelteKit & Unified SSR + client components; serverless-friendly; single deployment unit. \\
+\hline
+Database / ORM & PostgreSQL + Prisma & MongoDB, SQLite + raw SQL & Relational fit (users, workspaces, files, versions); typed queries; free Neon tier. \\
+\hline
+Realtime engine & Yjs + WebSocket & Operational Transform, polling, Firebase Realtime DB & CRDT guarantees convergence; self-hostable; no vendor lock-in. \\
+\hline
+Hosting & Vercel + Fly.io & Single VPS (AWS / DigitalOcean) & Vercel free for Next.js; Fly.io hosts long-lived WebSockets that Vercel cannot. \\
+\hline
+Data environment & Neon Postgres & Supabase, local Postgres & Free serverless tier; auto-scaling; SQL standard. \\
+\hline
+\end{tabular}
+\end{center}
+
+\subsection*{Success criteria}
+
+The product will be considered successful if it meets the following:
+
+\begin{enumerate}
+  \item Users can register with an email address and password, receive a verification email, and log in only after the address is verified.
+  \item The system parses and executes valid IB-pseudocode files, displaying program output and runtime errors with the offending line number.
+  \item Each user can create, rename, and delete multiple workspaces, each containing multiple pseudocode files with the \texttt{.psc} extension.
+  \item Workspaces can be marked public (any visitor with the URL can view) or private (only the owner and explicitly invited collaborators can view and edit).
+  \item Two or more collaborators editing the same file see each other's edits propagated within 500\,ms under typical typing speeds, with no lost or duplicated characters.
+  \item Every file maintains an automatic per-version history; users can view any previous version with a visual diff against the current state and restore it.
+  \item Any logged-in user can fork a public workspace, producing an independent editable copy under their own account.
+  \item The interface is responsive and remains usable on a mobile browser at viewport widths $\geq$~360\,px.
+  \item Passwords are stored hashed (bcrypt, cost factor $\geq 10$) and session tokens are kept in \texttt{httpOnly} cookies inaccessible to client JavaScript.
+  \item The main dashboard loads in under 3 seconds on a typical broadband connection ($\geq$~10\,Mbps).
+\end{enumerate}
+
+\vspace{0.4em}
+\noindent\textit{Word count (problem scenario + computational context): 309.}
+
+\end{document}
