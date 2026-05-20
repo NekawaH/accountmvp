@@ -4,14 +4,19 @@ LaTeX sources for the IBDP CS Internal Assessment. Each criterion is one self-co
 
 ## Diagrams (text → PDF)
 
-All diagrams are written as [Mermaid](https://mermaid.js.org) scripts. They're plain text — versionable, reviewable in a diff, regeneratable. The build script renders each `.mmd` to both PDF (for LaTeX) and SVG (for browser inspection) via `@mermaid-js/mermaid-cli`.
+All diagrams are written as [Mermaid](https://mermaid.js.org) scripts. They're plain text — versionable, reviewable in a diff, regeneratable. The build script POSTs each `.mmd` to [Kroki](https://kroki.io) and saves both PDF (for LaTeX) and SVG (for browser inspection).
 
 ```bash
 cd ia/diagrams
 ./build.sh
 ```
 
-First run downloads ~150 MB of headless Chromium (Mermaid renders in a real browser). Subsequent runs take a few seconds.
+Each diagram renders in ~2 seconds. No local install required (just `curl`, which ships with macOS). If you'd rather self-host the renderer (offline / privacy):
+
+```bash
+docker run --rm -p 8000:8000 yuzutech/kroki
+KROKI_URL=http://localhost:8000 ./build.sh
+```
 
 Sources:
 - `structure_chart.mmd` — sub-system decomposition (CritB)

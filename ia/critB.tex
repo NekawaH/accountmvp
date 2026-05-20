@@ -42,7 +42,7 @@ The final fortnight (April 2026) is reserved for integration testing across sub-
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=\textwidth,keepaspectratio]{diagrams/structure_chart.pdf}
+  \includegraphics[width=\textwidth,keepaspectratio]{diagrams/structure_chart.png}
   \caption{Structure chart: the seven sub-systems decomposed into concrete modules. Each leaf maps to a unit of work in the Gantt chart.}
 \end{figure}
 
@@ -50,7 +50,7 @@ The final fortnight (April 2026) is reserved for integration testing across sub-
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=\textwidth,keepaspectratio]{diagrams/erd.pdf}
+  \includegraphics[width=\textwidth,keepaspectratio]{diagrams/erd.png}
   \caption{Entity-relationship diagram of the Postgres schema backing persistence. \texttt{Workspace} has a self-referential \texttt{forkedFromId} edge for fork lineage; \texttt{FileVersion} captures author attribution required by the version-control sub-system.}
 \end{figure}
 
@@ -58,7 +58,7 @@ The final fortnight (April 2026) is reserved for integration testing across sub-
 
 \begin{sidewaysfigure}
   \centering
-  \includegraphics[width=0.95\textheight,keepaspectratio]{diagrams/gantt.pdf}
+  \includegraphics[width=0.95\textheight,keepaspectratio]{diagrams/gantt.png}
   \caption{Gantt chart covering every sub-system through plan, design, develop, test, and evaluate. Research blocks precede the sub-systems that depend on them. Wrap-up (integration + evaluation writeup) occupies the final three weeks.}
 \end{sidewaysfigure}
 

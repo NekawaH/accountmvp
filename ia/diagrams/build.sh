@@ -1,35 +1,58 @@
 #!/usr/bin/env bash
-# Renders every .mmd in this directory to PDF (and SVG) using mermaid-cli.
+# Renders every .mmd in this directory to PNG (via Kroki, high DPI) and SVG.
 #
-# Why mermaid-cli: diagrams live as plain text (versionable, diff-friendly,
-# regeneratable) and render via a single CLI. PDF is consumed by critB.tex
-# through \includegraphics; SVG is kept for inspection in a browser.
+# Why PNG instead of PDF/SVG-then-convert:
+#   - Mermaid flowcharts and ER diagrams put their labels inside SVG
+#     <foreignObject> HTML. rsvg-convert / cairosvg cannot render those —
+#     you get empty boxes.
+#   - Kroki rasterises server-side using a real headless browser, so every
+#     label renders correctly.
+#   - LaTeX's \includegraphics handles PNG natively. No local converter,
+#     no font installs.
 #
-# Requires Node.js. mermaid-cli is invoked via npx (-y auto-confirms install).
-# First run downloads ~150 MB of Chromium via Puppeteer; later runs are fast.
+# SVGs are still produced for browser-side inspection of the source diagram.
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
-MMDC="npx -y @mermaid-js/mermaid-cli"
-CONFIG="$(mktemp -t mmdcfg.XXXX).json"
-trap 'rm -f "$CONFIG"' EXIT
+KROKI="${KROKI_URL:-https://kroki.io}"
 
-# Bigger render canvas so wide structure charts + tall Gantt don't get cramped.
-cat > "$CONFIG" <<'JSON'
-{
-  "maxTextSize": 90000,
-  "flowchart": { "useMaxWidth": false, "htmlLabels": true },
-  "gantt":     { "useMaxWidth": false, "fontSize": 11, "barHeight": 14 },
-  "er":        { "useMaxWidth": false }
+# Kroki accepts diagram-options via either header or per-request JSON.
+# scale=3 gives ~3× the default raster resolution — sharp at print sizes.
+SCALE="${KROKI_SCALE:-3}"
+
+fetch() {
+  local src="$1" out="$2" fmt="$3"
+  local code
+  if [[ "$fmt" == "png" ]]; then
+    code=$(curl -s -o "$out" -w '%{http_code}' \
+                -X POST "$KROKI/mermaid/$fmt" \
+                -H 'Content-Type: text/plain' \
+                -H "Kroki-Diagram-Options: scale=$SCALE" \
+                --data-binary "@$src")
+  else
+    code=$(curl -s -o "$out" -w '%{http_code}' \
+                -X POST "$KROKI/mermaid/$fmt" \
+                -H 'Content-Type: text/plain' \
+                --data-binary "@$src")
+  fi
+  if [[ "$code" != "200" ]]; then
+    echo "  ✗ $fmt failed (HTTP $code):"
+    cat "$out"; echo
+    rm -f "$out"
+    return 1
+  fi
+  echo "  ✓ $out ($(wc -c < "$out") bytes)"
 }
-JSON
 
 for mmd in *.mmd; do
   base="${mmd%.mmd}"
   echo "→ $mmd"
-  $MMDC -i "$mmd" -o "${base}.pdf" -c "$CONFIG" -b white -t neutral --pdfFit
-  $MMDC -i "$mmd" -o "${base}.svg" -c "$CONFIG" -b white -t neutral
+  fetch "$mmd" "${base}.png" png || true
+  fetch "$mmd" "${base}.svg" svg || true
 done
 
-echo "done. outputs: $(ls *.pdf *.svg 2>/dev/null | tr '\n' ' ')"
+# Clean stale PDFs from the previous broken pipeline so LaTeX picks up the PNGs.
+rm -f ./*.pdf
+
+echo "done."
