@@ -164,6 +164,76 @@
         return parts;
     }
 
+    // --- ERROR HELPERS ---
+    // Returns a user-friendly message for common runtime JS errors that arise
+    // from pseudocode mistakes (e.g. using an undeclared variable, type errors).
+    // lineNo is appended when provided; pass null to omit it.
+    function friendlyRuntimeError(msg, lineNo) {
+        const loc = lineNo != null ? ` (line ${lineNo})` : '';
+        if (!msg) return 'Unknown error' + loc;
+
+        // Step / termination sentinels — pass through unchanged.
+        if (msg === STEP_LIMIT_ERROR || msg === TERMINATED_ERROR) return msg;
+
+        // Constant mutation
+        if (msg.startsWith('Cannot modify constant ')) {
+            const name = msg.slice('Cannot modify constant '.length);
+            return `Cannot assign to constant ${name}: use DECLARE for mutable variables` + loc;
+        }
+        // Undefined variable / property
+        if (/^(\w+ is not defined|Cannot read prop)/.test(msg) || msg.includes('is not defined')) {
+            const m = msg.match(/(\w+) is not defined/);
+            const name = m ? m[1] : null;
+            if (name) return `Variable "${name}" is not declared — add: DECLARE ${name} : <TYPE>` + loc;
+            return `Undeclared variable used` + loc;
+        }
+        // Not a function
+        if (msg.includes('is not a function') || msg.includes('is not async function')) {
+            const m = msg.match(/"?(\w[\w.]*)"? is not/);
+            const name = m ? m[1] : null;
+            return name
+                ? `"${name}" is not a function or procedure — check spelling and that it is defined` + loc
+                : `Attempt to call a non-function` + loc;
+        }
+        // Null/undefined access
+        if (msg.includes('Cannot read properties of undefined') || msg.includes('Cannot read properties of null')) {
+            return `Used a variable or array element that has not been assigned a value` + loc;
+        }
+        // Array index
+        if (msg.toLowerCase().includes('array') && msg.toLowerCase().includes('index')) {
+            return `Array index out of bounds — check loop limits and array dimensions` + loc;
+        }
+        // Stack overflow / recursion
+        if (msg.includes('Maximum call stack') || msg.includes('stack overflow')) {
+            return `Stack overflow — likely infinite recursion; check your base case` + loc;
+        }
+        // File errors — pass through with location
+        if (msg.includes('not open for')) return msg + loc;
+        if (msg.includes('is not open')) return msg + loc;
+        // Procedure/function not found
+        if (msg.startsWith('Procedure not found:') || msg.startsWith('Function not found:')) {
+            const name = msg.split(':')[1]?.trim();
+            return `"${name}" is not defined as a procedure or function — check spelling` + loc;
+        }
+        if (msg.startsWith('Class not found:')) {
+            const name = msg.split(':')[1]?.trim();
+            return `Class "${name}" is not defined` + loc;
+        }
+        if (msg.startsWith('Invalid CALL:')) {
+            return `Malformed CALL statement — expected: CALL ProcedureName(args)` + loc;
+        }
+        // Generic fallthrough
+        return msg + loc;
+    }
+
+    // Raised by the parser for structural/syntax problems.
+    function ParseError(message, lineNo) {
+        const err = new Error(message);
+        err.name = 'ParseError';
+        err.lineNo = lineNo;
+        return err;
+    }
+
     // --- PARSER ---
     function parse(source) {
         const rawLines = splitLines(source);
@@ -235,6 +305,10 @@
                 i++;
                 return null;
             }
+            // +1 for 1-based line number as reported to users.
+            const stmtLine = i + 1;
+            // Tag every returned node with its source line.
+            function stmt(node) { return node ? Object.assign(node, { lineNo: stmtLine }) : node; }
 
             const tok0 = tokens[0].toUpperCase();
 
@@ -243,7 +317,7 @@
                 const colonIdx = rest.indexOf(':');
                 if (colonIdx === -1) {
                     i++;
-                    return { type: 'noop' };
+                    return stmt({ type: 'noop' });
                 }
                 const id = rest.slice(0, colonIdx).join('').trim();
                 const typeTokens = rest.slice(colonIdx + 1);
@@ -252,6 +326,9 @@
                 if (t0 === 'ARRAY') {
                     const bracketStart = typeTokens.indexOf('[');
                     const bracketEnd = typeTokens.indexOf(']');
+                    if (bracketStart === -1 || bracketEnd === -1) {
+                        throw ParseError(`DECLARE ${id}: ARRAY is missing dimension brackets [ ]`, stmtLine);
+                    }
                     const dimsSpec = typeTokens.slice(bracketStart + 1, bracketEnd).join('');
                     const dims = dimsSpec.split(',').map(s => {
                         const m = s.split(':').map(x => x.trim());
@@ -261,13 +338,16 @@
                         };
                     });
                     const ofIdx = typeTokens.findIndex(t => t.toUpperCase() === 'OF');
+                    if (ofIdx === -1) {
+                        throw ParseError(`DECLARE ${id}: ARRAY declaration is missing OF <type>`, stmtLine);
+                    }
                     const baseType = typeTokens.slice(ofIdx + 1).join('').trim();
                     i++;
-                    return { type: 'declare_array', id, dims, baseType };
+                    return stmt({ type: 'declare_array', id, dims, baseType });
                 } else {
                     const baseType = typeTokens.join('').trim();
                     i++;
-                    return { type: 'declare', id, baseType };
+                    return stmt({ type: 'declare', id, baseType });
                 }
             }
 
@@ -277,16 +357,17 @@
                 let assignIdx = rest.findIndex(t => t === '<-' || t === '=');
                 if (assignIdx === -1) {
                     i++;
-                    return { type: 'noop' };
+                    return stmt({ type: 'noop' });
                 }
                 const expr = rest.slice(assignIdx + 1).join(' ');
                 i++;
                 definitions.constants.add(id);
-                return { type: 'constant', id, expr };
+                return stmt({ type: 'constant', id, expr });
             }
 
             if (tok0 === 'TYPE') {
                 const name = tokens[1];
+                if (!name) throw ParseError('TYPE is missing a name', stmtLine);
                 i++;
                 const attrs = {};
                 while (i < tokensByLine.length) {
@@ -311,11 +392,12 @@
                     i++;
                 }
                 definitions.types[name] = { attrs };
-                return { type: 'type_def', name, attrs };
+                return stmt({ type: 'type_def', name, attrs });
             }
 
             if (tok0 === 'CLASS') {
                 const className = tokens[1];
+                if (!className) throw ParseError('CLASS is missing a name', stmtLine);
                 let superClassName = null;
                 if (tokens.length >= 4 && tokens[2].toUpperCase() === 'INHERITS') {
                     superClassName = tokens[3];
@@ -346,7 +428,7 @@
                         const parenStart = nameLine.indexOf('(');
                         const parenEnd = nameLine.lastIndexOf(')');
                         const paramStr = (parenStart >= 0 && parenEnd >= 0) ? nameLine.slice(parenStart + 1, parenEnd) : '';
-                        
+
                         const params = parseParams(paramStr);
                         const returnsType = isFunc ? nameLine.slice(nameLine.toUpperCase().indexOf('RETURNS') + 7).trim() : null;
 
@@ -356,7 +438,7 @@
                         if (i < tokensByLine.length && endTokens.some(et => (tokensByLine[i][0]||'').toUpperCase() === et)) i++;
 
                         methods[name] = { type: isFunc ? 'function' : 'procedure', name, params, returnsType, body, isPrivate };
-                    } 
+                    }
                     else if (nextTok !== '') {
                         const rest = tline.slice(startIdx);
                         const colonIdx = rest.indexOf(':');
@@ -373,16 +455,17 @@
                     }
                 }
                 definitions.classes[className] = { name: className, superClassName, properties, methods };
-                return { type: 'noop' };
+                return stmt({ type: 'noop' });
             }
 
             if (tok0 === 'FUNCTION') {
+                if (!tokens[1]) throw ParseError('FUNCTION is missing a name', stmtLine);
                 const name = tokens[1].split('(')[0];
                 const fullLine = tokens.join(' ');
                 const parenStart = fullLine.indexOf('(');
                 const parenEnd = fullLine.lastIndexOf(')');
                 const paramStr = (parenStart >= 0 && parenEnd >= 0) ? fullLine.slice(parenStart + 1, parenEnd) : '';
-                
+
                 const params = parseParams(paramStr);
 
                 const up = fullLine.toUpperCase();
@@ -391,33 +474,43 @@
 
                 i++;
                 const body = parseBlock(['ENDFUNCTION']);
+                if (i >= tokensByLine.length) {
+                    throw ParseError(`FUNCTION "${name}" started on line ${stmtLine} is missing ENDFUNCTION`, stmtLine);
+                }
                 if (i < tokensByLine.length && tokensByLine[i]?.[0]?.toUpperCase() === 'ENDFUNCTION') {
                     i++;
                 }
                 definitions.functions[name] = { type: 'function', name, params, returnsType, body };
-                return { type: 'function_def', name, params, returnsType, body };
+                return stmt({ type: 'function_def', name, params, returnsType, body });
             }
 
             if (tok0 === 'PROCEDURE') {
+                if (!tokens[1]) throw ParseError('PROCEDURE is missing a name', stmtLine);
                 const full = tokens.join(' ');
                 const name = tokens[1].split('(')[0];
                 const parenStart = full.indexOf('(');
                 const parenEnd = full.lastIndexOf(')');
                 const paramStr = (parenStart >= 0 && parenEnd >= 0) ? full.slice(parenStart + 1, parenEnd) : '';
-                
+
                 const params = parseParams(paramStr);
 
                 i++;
                 const body = parseBlock(['ENDPROCEDURE']);
+                if (i >= tokensByLine.length) {
+                    throw ParseError(`PROCEDURE "${name}" started on line ${stmtLine} is missing ENDPROCEDURE`, stmtLine);
+                }
                 if (i < tokensByLine.length && tokensByLine[i]?.[0]?.toUpperCase() === 'ENDPROCEDURE') {
                     i++;
                 }
                 definitions.functions[name] = { type: 'procedure', name, params, body };
-                return { type: 'proc_def', name, params, body };
+                return stmt({ type: 'proc_def', name, params, body });
             }
 
             if (tok0 === 'IF') {
                 const line = tokens.join(' ');
+                if (!/THEN\s*$/i.test(line.trim())) {
+                    throw ParseError(`IF statement on line ${stmtLine} is missing THEN`, stmtLine);
+                }
                 const cond = line.replace(/^IF\s+/i, '').replace(/\s+THEN\s*$/i, '').trim();
                 i++;
                 const cases = [];
@@ -437,7 +530,7 @@
                         if (i < tokensByLine.length && tokensByLine[i]?.[0]?.toUpperCase() === 'ENDIF') {
                             i++;
                         }
-                        return { type: 'if', cases, elseBody };
+                        return stmt({ type: 'if', cases, elseBody });
                     } else if (head === 'ELSE' && (tline[1] || '').toUpperCase() === 'IF') {
                         const full = tline.join(' ');
                         const m = full.match(/ELSE\s+IF\s+(.*?)\s+THEN/i);
@@ -450,60 +543,78 @@
                         }
                     } else if (head === 'ENDIF') {
                         i++;
-                        return { type: 'if', cases, elseBody: null };
+                        return stmt({ type: 'if', cases, elseBody: null });
                     } else {
                         break;
                     }
                 }
-                return { type: 'if', cases, elseBody: null };
+                return stmt({ type: 'if', cases, elseBody: null });
             }
 
             if (tok0 === 'WHILE') {
                 const full = tokens.join(' ');
+                if (!/\bDO\s*$/i.test(full.trim())) {
+                    throw ParseError(`WHILE statement on line ${stmtLine} is missing DO`, stmtLine);
+                }
                 const m = full.match(/^WHILE\s+(.*)\s+DO$/i);
                 const cond = m ? m[1].trim() : full.replace(/^WHILE/i, '').replace(/DO$/i, '').trim();
                 i++;
                 const body = parseBlock(['ENDWHILE']);
+                if (i >= tokensByLine.length) {
+                    throw ParseError(`WHILE on line ${stmtLine} is missing ENDWHILE`, stmtLine);
+                }
                 if (i < tokensByLine.length && tokensByLine[i]?.[0]?.toUpperCase() === 'ENDWHILE') {
                     i++;
                 }
-                return { type: 'while', condition: cond, body };
+                return stmt({ type: 'while', condition: cond, body });
             }
 
             if (tok0 === 'REPEAT') {
                 i++;
                 const body = parseBlock(['UNTIL']);
+                if (i >= tokensByLine.length) {
+                    throw ParseError(`REPEAT on line ${stmtLine} is missing UNTIL`, stmtLine);
+                }
                 if (i < tokensByLine.length) {
                     const untilLine = tokensByLine[i].join(' ').trim();
                     const m = untilLine.match(/^UNTIL\s+(.*)$/i);
                     let cond = m ? m[1].trim() : null;
+                    if (!cond) throw ParseError(`UNTIL on line ${i + 1} is missing its condition`, i + 1);
                     i++;
-                    return { type: 'repeat', body, until: cond };
+                    return stmt({ type: 'repeat', body, until: cond });
                 }
-                return { type: 'repeat', body, until: null };
+                return stmt({ type: 'repeat', body, until: null });
             }
 
             if (tok0 === 'FOR') {
                 const full = tokens.join(' ');
                 const m = full.match(/^FOR\s+([A-Za-z_]\w*)\s*(?:<-|=)\s*(.*?)\s+TO\s+(.*)$/i);
                 if (!m) {
-                    i++;
-                    return { type: 'noop' };
+                    throw ParseError(
+                        `FOR statement on line ${stmtLine} has incorrect syntax. Expected: FOR <var> <- <start> TO <end>`,
+                        stmtLine
+                    );
                 }
                 const v = m[1];
                 const start = m[2].trim();
                 const end = m[3].trim();
                 i++;
                 const body = parseBlock(['NEXT']);
+                if (i >= tokensByLine.length) {
+                    throw ParseError(`FOR loop started on line ${stmtLine} is missing NEXT`, stmtLine);
+                }
                 if (i < tokensByLine.length && tokensByLine[i]?.[0]?.toUpperCase() === 'NEXT') {
                     i++;
                 }
-                return { type: 'for', var: v, start, end, body };
+                return stmt({ type: 'for', var: v, start, end, body });
             }
 
             if (tok0 === 'CASE') {
                 const full = tokensByLine[i].join(' ');
                 const m = full.match(/^CASE\s+OF\s+(.*)$/i);
+                if (!m) {
+                    throw ParseError(`CASE statement on line ${stmtLine} must be written as: CASE OF <expression>`, stmtLine);
+                }
                 const expr = m ? m[1].trim() : null;
                 i++;
                 const branches = [];
@@ -537,25 +648,25 @@
                     }
                     i++;
                 }
-                return { type: 'case', expr, branches, otherwise };
+                return stmt({ type: 'case', expr, branches, otherwise });
             }
 
             if (tok0 === 'CALL') {
                 const rest = tokens.slice(1).join(' ');
                 i++;
-                return { type: 'call', call: rest };
+                return stmt({ type: 'call', call: rest });
             }
 
             if (tok0 === 'OUTPUT') {
                 const expr = tokens.slice(1).join(' ');
                 i++;
-                return { type: 'output', expr };
+                return stmt({ type: 'output', expr });
             }
 
             if (tok0 === 'INPUT') {
-                const id = tokens.slice(1).join(''); 
+                const id = tokens.slice(1).join('');
                 i++;
-                return { type: 'input', id };
+                return stmt({ type: 'input', id });
             }
 
             const arrowIdx = tokens.indexOf('<-') >= 0 ? tokens.indexOf('<-') : tokens.indexOf('=');
@@ -563,7 +674,7 @@
                 const left = tokens.slice(0, arrowIdx).join('');
                 let rightTokens = tokens.slice(arrowIdx + 1);
                 let isRefAssign = false;
-                
+
                 if (rightTokens.length > 0 && rightTokens[0] === '^') {
                     isRefAssign = true;
                     rightTokens.shift();
@@ -582,49 +693,59 @@
                     }
                     const argExprs = splitTopLevel(argsStr, ',').map(s => s.trim()).filter(s => s);
                     i++;
-                    return { type: 'instantiate', left, className, args: argExprs };
+                    return stmt({ type: 'instantiate', left, className, args: argExprs });
                 }
 
                 const expr = rightTokens.join(' ');
                 i++;
-                return { type: 'assign', left, expr, isRefAssign };
+                return stmt({ type: 'assign', left, expr, isRefAssign });
             }
 
             if (tok0 === 'RETURN') {
                 const expr = tokens.slice(1).join(' ');
                 i++;
-                return { type: 'return', expr };
+                return stmt({ type: 'return', expr });
             }
 
             if (tok0 === 'OPENFILE') {
-                const fileName = tokens[1];
+                if (!tokens[1]) throw ParseError(`OPENFILE on line ${stmtLine} is missing a filename`, stmtLine);
+                const validModes = ['READ', 'WRITE', 'APPEND'];
                 const mode = tokens[tokens.length - 1].toUpperCase();
+                if (!validModes.includes(mode)) {
+                    throw ParseError(`OPENFILE on line ${stmtLine}: mode must be READ, WRITE, or APPEND (got "${mode}")`, stmtLine);
+                }
                 i++;
-                return { type: 'openfile', fileName, mode };
+                return stmt({ type: 'openfile', fileName: tokens[1], mode });
             }
-            
+
             if (tok0 === 'WRITEFILE') {
                 const dataIdx = tokens[2] === ',' ? 3 : 2;
                 const data = tokens.slice(dataIdx).join(' ');
                 i++;
-                return { type: 'writefile', fileName: tokens[1], data };
+                return stmt({ type: 'writefile', fileName: tokens[1], data });
             }
-            
+
             if (tok0 === 'READFILE') {
                 const varName = tokens[2] === ',' ? tokens[3] : tokens[2];
                 i++;
-                return { type: 'readfile', fileName: tokens[1], varName };
+                return stmt({ type: 'readfile', fileName: tokens[1], varName });
             }
-            
+
             if (tok0 === 'CLOSEFILE') {
                 const fileName = tokens[1];
                 i++;
-                return { type: 'closefile', fileName };
+                return stmt({ type: 'closefile', fileName });
+            }
+
+            // Stray closing keywords — likely a missing opener
+            const closers = { ENDIF: 'IF/THEN', ENDWHILE: 'WHILE/DO', ENDFUNCTION: 'FUNCTION', ENDPROCEDURE: 'PROCEDURE', ENDCASE: 'CASE OF', ENDTYPE: 'TYPE', ENDCLASS: 'CLASS', NEXT: 'FOR' };
+            if (closers[tok0]) {
+                throw ParseError(`Unexpected "${tok0}" on line ${stmtLine} — no matching ${closers[tok0]} found above it`, stmtLine);
             }
 
             const fallbackExpr = tokens.join(' ');
             i++;
-            return { type: 'expr', expr: fallbackExpr };
+            return stmt({ type: 'expr', expr: fallbackExpr });
         }
 
         function parseInlineStatementFromString(str) {
@@ -1071,6 +1192,20 @@
                 if (stepCount > stepLimit) throw new Error(STEP_LIMIT_ERROR);
             }
             await _maybeYield();
+            // Wrap any runtime error with its source line number (stored on the
+            // AST node by the parser) so friendly messages can include it.
+            const _lineNo = node.lineNo ?? null;
+            const _wrapError = (e) => {
+                if (!e) return e;
+                if (e.message === STEP_LIMIT_ERROR || e.message === TERMINATED_ERROR) return e;
+                // Only enrich once — already-friendly messages contain " (line "
+                if (!e.lineNo && !String(e.message).includes(' (line ')) e.lineNo = _lineNo;
+                // Rewrite the message with location info for the console display.
+                // The separate e.lineNo field is used by the UI error panel.
+                if (!String(e.message).includes(' (line ')) e.message = friendlyRuntimeError(e.message, e.lineNo);
+                return e;
+            };
+            try {
             switch (node.type) {
                 case 'noop':
                     return null;
@@ -1233,9 +1368,7 @@
                     return null;
                 }
                 case 'call': {
-                    console.log(node.call, localBindings, instance);
                     if (node.call.includes('.')) {
-                        console.log('tetsttt');
                         await evalExpr(node.call, localBindings, instance);
                         return null;
                     }
@@ -1318,6 +1451,7 @@
                 }
             }
             return null;
+            } catch(e) { throw _wrapError(e); }
         }
 
         return {
@@ -1363,7 +1497,7 @@
 
         // Populated after each run() so the server-side grader can tell a
         // step-limit error apart from regular runtime errors.
-        lastRun: { stepLimitExceeded: false, stepsUsed: 0, error: null },
+        lastRun: { stepLimitExceeded: false, stepsUsed: 0, error: null, lineNo: null, isParseError: false },
 
         async run(source, vfs) {
             if (vfs) window.vfs = vfs;
@@ -1371,7 +1505,7 @@
             stepCount = 0;
             yieldCounter = 0;
             terminationRequested = false;
-            this.lastRun = { stepLimitExceeded: false, stepsUsed: 0, error: null };
+            this.lastRun = { stepLimitExceeded: false, stepsUsed: 0, error: null, lineNo: null, isParseError: false };
             try {
                 const parsed = parse(source);
                 const ex = createExecutor(parsed.definitions);
@@ -1384,8 +1518,17 @@
                     // Silent — caller (the IDE Stop button) is responsible for
                     // any "[Terminated]" message it wants to show.
                 } else {
-                    this.lastRun.error = e && e.message;
-                    appendConsole('Error: ' + (e && e.message));
+                    const isParseError = e && e.name === 'ParseError';
+                    const lineNo = (e && e.lineNo) ?? null;
+                    // Strip the trailing " (line N)" from the message so the UI
+                    // can render the location separately without duplication.
+                    const rawMsg = (e && e.message) || '';
+                    const msg = rawMsg.replace(/ \(line \d+\)$/, '');
+                    this.lastRun.error = msg;
+                    this.lastRun.lineNo = lineNo;
+                    this.lastRun.isParseError = !!isParseError;
+                    const prefix = isParseError ? 'Syntax error' : 'Error';
+                    appendConsole(`${prefix}: ${rawMsg}`);
                 }
             }
             this.lastRun.stepsUsed = stepCount;

@@ -19,6 +19,8 @@ interface CaseResult {
   passed: boolean
   timedOut: boolean
   error: string | null
+  lineNo: number | null
+  isParseError: boolean
 }
 interface SubmitResult {
   passed: boolean
@@ -241,7 +243,10 @@ export default function ProblemPage({ params }: { params: { slug: string } }) {
                   </span>
                 </div>
                 {!c.passed && c.error && (
-                  <p className="text-xs text-red-600 mt-1">{c.error}</p>
+                  <p className="text-xs text-red-600 mt-1">
+                    <span className="font-medium">{c.isParseError ? 'Syntax error' : 'Error'}{c.lineNo != null ? ` (line ${c.lineNo})` : ''}: </span>
+                    {c.error}
+                  </p>
                 )}
               </li>
             ))}

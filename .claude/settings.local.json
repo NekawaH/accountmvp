@@ -18,7 +18,10 @@
       "Bash(wc -l /Users/alt/Documents/accountmvp/public/pseudorunner/*.js)",
       "Bash(timeout 4 npx tsx --env-file=.env server/yws.ts)",
       "Bash(echo \"exit=$?\")",
-      "Bash(chmod +x:*)"
+      "Bash(chmod +x:*)",
+      "Bash(node --input-type=module)",
+      "Bash(node -e \"require\\('./public/pseudorunner/async_interpreter.js'\\)\")",
+      "Bash(node:*)"
     ]
   }
 }

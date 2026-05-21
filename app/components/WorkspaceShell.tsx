@@ -198,6 +198,8 @@ export default function WorkspaceShell({
 }: Props) {
   const [running, setRunning] = useState(false)
   const [consoleWidth, setConsoleWidth] = useState(320)
+  // errorInfo is set when the interpreter reports an error with a line number.
+  const [errorInfo, setErrorInfo] = useState<{ message: string; lineNo: number | null; isParseError: boolean } | null>(null)
 
   const inputBoxRef = useRef<HTMLTextAreaElement>(null)
   const terminalRef = useRef<HTMLTextAreaElement>(null)
@@ -280,6 +282,7 @@ export default function WorkspaceShell({
     if (runningRef.current) return
     runningRef.current = true
     setRunning(true)
+    setErrorInfo(null)
 
     initInterpreter()
     const w = window as any
@@ -317,6 +320,13 @@ export default function WorkspaceShell({
 
       const vfsBefore: Record<string, string> = { ...w.vfs }
       await w.pseudoIDE.run(code, null)
+
+      // Expose line-level error info from the interpreter for the error panel.
+      const lr = w.pseudoIDE.lastRun
+      if (lr?.error && !lr.stepLimitExceeded) {
+        setErrorInfo({ message: lr.error, lineNo: lr.lineNo ?? null, isParseError: !!lr.isParseError })
+      }
+
       if (onAfterRun) await onAfterRun(vfsBefore, { ...w.vfs })
     } catch (err: any) {
       if (!terminatedRef.current) {
@@ -462,6 +472,36 @@ export default function WorkspaceShell({
             }
           </div>
 
+          {/* Error panel — shown when the interpreter reports a line-level error */}
+          {errorInfo && (
+            <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border-b border-red-200 text-xs text-red-800 flex-shrink-0">
+              <span className="font-semibold flex-shrink-0">{errorInfo.isParseError ? 'Syntax error' : 'Error'}{errorInfo.lineNo != null ? ` on line ${errorInfo.lineNo}` : ''}:</span>
+              <span className="flex-1 break-words">{errorInfo.message}</span>
+              {errorInfo.lineNo != null && (
+                <button
+                  className="flex-shrink-0 underline text-red-700 hover:text-red-900 font-medium"
+                  onClick={() => {
+                    const ta = inputBoxRef.current
+                    if (!ta) return
+                    const lines = ta.value.split('\n')
+                    const targetLine = Math.min(errorInfo.lineNo! - 1, lines.length - 1)
+                    const pos = lines.slice(0, targetLine).reduce((acc, l) => acc + l.length + 1, 0)
+                    ta.focus()
+                    ta.setSelectionRange(pos, pos + (lines[targetLine]?.length ?? 0))
+                    // Scroll the textarea so the error line is visible.
+                    const lineHeight = 21
+                    ta.scrollTop = Math.max(0, targetLine * lineHeight - ta.clientHeight / 2)
+                  }}
+                >Jump to line</button>
+              )}
+              <button
+                className="flex-shrink-0 text-red-400 hover:text-red-700"
+                onClick={() => setErrorInfo(null)}
+                title="Dismiss"
+              >✕</button>
+            </div>
+          )}
+
           <div className="flex-1 flex overflow-hidden min-h-0">
             {/* Code editor */}
             <div className="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -470,9 +510,30 @@ export default function WorkspaceShell({
                   className="bg-gray-100 text-gray-400 text-right text-xs font-mono select-none flex-shrink-0 pt-2.5 pr-2 pl-1"
                   style={{ lineHeight: '21px', minWidth: '2.5rem', height: `${lineCount * 21 + 20}px`, minHeight: '100%' }}
                 >
-                  {Array.from({ length: lineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
+                  {Array.from({ length: lineCount }, (_, i) => (
+                    <div
+                      key={i}
+                      style={errorInfo?.lineNo === i + 1 ? { color: '#dc2626', fontWeight: 700, background: '#fee2e2' } : undefined}
+                    >{i + 1}</div>
+                  ))}
                 </div>
                 <div className="flex-1 relative" style={{ minHeight: '100%', height: `${lineCount * 21 + 20}px` }}>
+                  {/* Error line highlight strip — rendered behind syntax highlight and textarea */}
+                  {errorInfo?.lineNo != null && (
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        right: 0,
+                        top: `${(errorInfo.lineNo - 1) * 21 + 10}px`,
+                        height: '21px',
+                        background: 'rgba(254,226,226,0.7)',
+                        pointerEvents: 'none',
+                        zIndex: 0,
+                      }}
+                    />
+                  )}
                   <HighlightedPseudocode
                     code={code}
                     className="font-mono text-sm p-2.5"

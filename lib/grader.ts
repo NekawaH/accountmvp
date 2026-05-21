@@ -19,6 +19,8 @@ export interface CaseResult {
   timedOut?: boolean
   stepLimitExceeded?: boolean
   stepsUsed?: number
+  lineNo?: number | null
+  isParseError?: boolean
 }
 
 export interface GradeResult {
@@ -135,6 +137,12 @@ async function runCase(code: string, stdin: string, maxSteps: number): Promise<C
       stepsUsed,
       error: 'time limit exceeded',
     }
+  }
+  const runtimeError = pseudoIDE.lastRun?.error ?? undefined
+  const lineNo = pseudoIDE.lastRun?.lineNo ?? undefined
+  const isParseError = pseudoIDE.lastRun?.isParseError ?? false
+  if (runtimeError) {
+    return { passed: false, actualStdout: output, stepsUsed, error: runtimeError, lineNo, isParseError }
   }
   return { passed: false, actualStdout: output, stepsUsed }
 }
